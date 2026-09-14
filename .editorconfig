@@ -1,0 +1,18 @@
+# Указывает, что это корневой файл конфигурации
+root = true
+
+[*.{cpp,h,hpp,cc,cxx}]
+# Базовые настройки отступов
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# Настройка расположения фигурных скобок для C++
+# SameLine означает, что скобка НЕ будет переноситься на новую строку
+cpp_indent_braces = false
+cpp_brace_style = SameLine
+
+# Настройки для конкретных конструкций (для некоторых парсеров)
+cpp_indent_namespace_braces = false
+cpp_indent_class_braces = false
+cpp_indent_function_braces = false
