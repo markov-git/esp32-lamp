@@ -16,6 +16,7 @@ private:
     WebServer server;
     Api& api;
 
+    void handleNotFound();
     void handleFile();
 
     String getContentType(const String& path);

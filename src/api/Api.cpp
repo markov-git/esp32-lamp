@@ -17,15 +17,80 @@ void Api::registerRoutes(WebServer& server)
             handleState(server);
         }
     );
+}
 
-    server.on(
-        "/api/lamp/1/brightness",
-        HTTP_POST,
-        [this, &server]()
-        {
-            handleSetBrightness(server);
-        }
+bool Api::handleRequest(WebServer& server)
+{
+    const String uri = server.uri();
+
+    if (!uri.startsWith("/api/lamp/"))
+    {
+        return false;
+    }
+
+    // /api/lamp/1/red
+    String path = uri.substring(
+        String("/api/lamp/").length()
     );
+
+    const int separator = path.indexOf('/');
+
+    if (separator < 0)
+    {
+        server.send(
+            400,
+            "application/json",
+            R"({"error":"invalid lamp endpoint"})"
+        );
+
+        return true;
+    }
+
+    const String lampValue =
+        path.substring(0, separator);
+
+    const String channelValue =
+        path.substring(separator + 1);
+
+    Lamp lamp;
+    Channel channel;
+
+    if (!parseLamp(lampValue, lamp))
+    {
+        server.send(
+            400,
+            "application/json",
+            R"({"error":"invalid lamp"})"
+        );
+
+        return true;
+    }
+
+    if (!parseChannel(channelValue, channel))
+    {
+        server.send(
+            400,
+            "application/json",
+            R"({"error":"invalid channel"})"
+        );
+
+        return true;
+    }
+
+    if (server.method() != HTTP_POST)
+    {
+        server.send(
+            405,
+            "application/json",
+            R"({"error":"method not allowed"})"
+        );
+
+        return true;
+    }
+
+    handleSetBrightness(server, lamp, channel);
+
+    return true;
 }
 
 void Api::handleState(WebServer& server)
@@ -70,7 +135,11 @@ void Api::handleState(WebServer& server)
     );
 }
 
-void Api::handleSetBrightness(WebServer& server)
+void Api::handleSetBrightness(
+    WebServer& server,
+    Lamp lamp,
+    Channel channel
+)
 {
     if (!server.hasArg("value"))
     {
@@ -97,18 +166,17 @@ void Api::handleSetBrightness(WebServer& server)
         return;
     }
 
-    // Пока временно Lamp1/Red.
     lighting.setBrightness(
-        Lamp::Lamp1,
-        Channel::Red,
-        value
+        lamp,
+        channel,
+        static_cast<uint8_t>(value)
     );
 
     String json = "{";
-    json += "\"red\":";
+    json += "\"brightness\":";
     json += lighting.getBrightness(
-        Lamp::Lamp1,
-        Channel::Red
+        lamp,
+        channel
     );
     json += "}";
 
@@ -117,4 +185,50 @@ void Api::handleSetBrightness(WebServer& server)
         "application/json",
         json
     );
+}
+
+bool Api::parseLamp(
+    const String& value,
+    Lamp& lamp
+)
+{
+    if (value == "1")
+    {
+        lamp = Lamp::Lamp1;
+        return true;
+    }
+
+    if (value == "2")
+    {
+        lamp = Lamp::Lamp2;
+        return true;
+    }
+
+    if (value == "3")
+    {
+        lamp = Lamp::Lamp3;
+        return true;
+    }
+
+    return false;
+}
+
+bool Api::parseChannel(
+    const String& value,
+    Channel& channel
+)
+{
+    if (value == "red")
+    {
+        channel = Channel::Red;
+        return true;
+    }
+
+    if (value == "blue")
+    {
+        channel = Channel::Blue;
+        return true;
+    }
+
+    return false;
 }

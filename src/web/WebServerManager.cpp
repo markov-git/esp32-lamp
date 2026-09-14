@@ -17,7 +17,7 @@ void WebServerManager::begin()
     server.onNotFound(
         [this]()
         {
-            handleFile();
+            handleNotFound();
         }
     );
 
@@ -29,6 +29,17 @@ void WebServerManager::begin()
 void WebServerManager::handleClient()
 {
     server.handleClient();
+}
+
+void WebServerManager::handleNotFound()
+{
+    if (server.uri().startsWith("/api/"))
+    {
+        api.handleRequest(server);
+        return;
+    }
+
+    handleFile();
 }
 
 void WebServerManager::handleFile()
