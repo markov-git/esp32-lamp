@@ -2,20 +2,41 @@
 
 #include <cstdint>
 
+enum class Lamp : uint8_t
+{
+    Lamp1 = 0,
+    Lamp2 = 1,
+    Lamp3 = 2
+};
+
+enum class Channel : uint8_t
+{
+    Red = 0,
+    Blue = 1
+};
+
 class Lighting
 {
 public:
     void begin();
 
-    void setBrightness(uint8_t percent);
-    uint8_t getBrightness() const;
+    void setBrightness(
+        Lamp lamp,
+        Channel channel,
+        uint8_t percent
+    );
+
+    uint8_t getBrightness(
+        Lamp lamp,
+        Channel channel
+    ) const;
 
 private:
-    static constexpr uint8_t LED_PIN = 16;
+    static constexpr uint8_t LAMP_COUNT = 3;
+    static constexpr uint8_t CHANNELS_PER_LAMP = 2;
 
-    static constexpr uint8_t PWM_CHANNEL = 0;
-    static constexpr uint32_t PWM_FREQUENCY = 1000;
-    static constexpr uint8_t PWM_RESOLUTION = 8;
+    uint8_t brightness[LAMP_COUNT][CHANNELS_PER_LAMP] = {};
 
-    uint8_t brightness = 0;
+    uint8_t getChannelIndex(Channel channel) const;
+    uint8_t getLampIndex(Lamp lamp) const;
 };

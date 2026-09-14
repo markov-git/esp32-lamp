@@ -30,10 +30,38 @@ void Api::registerRoutes(WebServer& server)
 
 void Api::handleState(WebServer& server)
 {
-    String json = "{";
-    json += "\"brightness\":";
-    json += lighting.getBrightness();
-    json += "}";
+    String json = R"({"lamps":[)";
+
+    for (uint8_t lampIndex = 0; lampIndex < 3; lampIndex++)
+    {
+        if (lampIndex > 0)
+        {
+            json += ",";
+        }
+
+        const Lamp lamp =
+            static_cast<Lamp>(lampIndex);
+
+        json += "{";
+        json += "\"id\":";
+        json += lampIndex + 1;
+
+        json += ",\"red\":";
+        json += lighting.getBrightness(
+            lamp,
+            Channel::Red
+        );
+
+        json += ",\"blue\":";
+        json += lighting.getBrightness(
+            lamp,
+            Channel::Blue
+        );
+
+        json += "}";
+    }
+
+    json += "]}";
 
     server.send(
         200,
@@ -69,11 +97,19 @@ void Api::handleSetBrightness(WebServer& server)
         return;
     }
 
-    lighting.setBrightness(value);
+    // Пока временно Lamp1/Red.
+    lighting.setBrightness(
+        Lamp::Lamp1,
+        Channel::Red,
+        value
+    );
 
     String json = "{";
-    json += "\"brightness\":";
-    json += lighting.getBrightness();
+    json += "\"red\":";
+    json += lighting.getBrightness(
+        Lamp::Lamp1,
+        Channel::Red
+    );
     json += "}";
 
     server.send(
