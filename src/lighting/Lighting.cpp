@@ -4,7 +4,7 @@
 
 namespace
 {
-    constexpr uint8_t PWM_FREQUENCY = 1000;
+    constexpr int PWM_FREQUENCY = 1000;
     constexpr uint8_t PWM_RESOLUTION = 8;
 
     // Пока подключен только тестовый LED.
@@ -33,6 +33,22 @@ void Lighting::begin()
             brightness[lamp][channel] = 0;
         }
     }
+}
+
+LightingState Lighting::getState() const
+{
+    LightingState state{};
+
+    for (uint8_t lamp = 0; lamp < LAMP_COUNT; lamp++)
+    {
+        state.lamps[lamp].red =
+            brightness[lamp][0];
+
+        state.lamps[lamp].blue =
+            brightness[lamp][1];
+    }
+
+    return state;
 }
 
 void Lighting::setBrightness(

@@ -95,33 +95,25 @@ bool Api::handleRequest(WebServer& server)
 
 void Api::handleState(WebServer& server)
 {
+    const LightingState state = lighting.getState();
     String json = R"({"lamps":[)";
 
-    for (uint8_t lampIndex = 0; lampIndex < 3; lampIndex++)
+    for (uint8_t lampIndex = 0; lampIndex < Lighting::LAMP_COUNT; lampIndex++)
     {
         if (lampIndex > 0)
         {
             json += ",";
         }
 
-        const Lamp lamp =
-            static_cast<Lamp>(lampIndex);
-
         json += "{";
         json += "\"id\":";
         json += lampIndex + 1;
 
         json += ",\"red\":";
-        json += lighting.getBrightness(
-            lamp,
-            Channel::Red
-        );
+        json += state.lamps[lampIndex].red;
 
         json += ",\"blue\":";
-        json += lighting.getBrightness(
-            lamp,
-            Channel::Blue
-        );
+        json += state.lamps[lampIndex].blue;
 
         json += "}";
     }
