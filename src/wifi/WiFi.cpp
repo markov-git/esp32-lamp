@@ -1,5 +1,5 @@
 #include "WiFi.h"
-
+#include <ESPmDNS.h>
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -27,4 +27,15 @@ void setupWiFi()
 
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
+
+    if (!MDNS.begin("lamp"))
+    {
+        Serial.println("Error starting mDNS");
+        return;
+    }
+
+    MDNS.addService("http", "tcp", 80);
+
+    Serial.println("mDNS started");
+    Serial.println("http://lamp.local");
 }
