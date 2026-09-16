@@ -1,6 +1,7 @@
 #pragma once
 
 #include <WebServer.h>
+#include <ArduinoJson.h>
 
 #include "../lighting/Lighting.h"
 
@@ -16,11 +17,14 @@ private:
     Lighting& lighting;
 
     void handleState(WebServer& server);
+
     void handleSetBrightness(
         WebServer& server,
         Lamp lamp,
         Channel channel
     );
+
+    void sendState(WebServer& server);
 
     bool parseLamp(
         const String& value,

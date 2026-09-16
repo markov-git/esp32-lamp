@@ -1,6 +1,7 @@
 #include "Api.h"
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 Api::Api(Lighting& lighting)
     : lighting(lighting)
@@ -95,35 +96,34 @@ bool Api::handleRequest(WebServer& server)
 
 void Api::handleState(WebServer& server)
 {
+    sendState(server);
+}
+
+void Api::sendState(WebServer& server)
+{
     const LightingState state = lighting.getState();
-    String json = R"({"lamps":[)";
 
-    for (uint8_t lampIndex = 0; lampIndex < Lighting::LAMP_COUNT; lampIndex++)
+    JsonDocument doc;
+
+    JsonArray lamps = doc["lamps"].to<JsonArray>();
+
+    for (uint8_t i = 0; i < Lighting::LAMP_COUNT; i++)
     {
-        if (lampIndex > 0)
-        {
-            json += ",";
-        }
+        JsonObject lamp = lamps.add<JsonObject>();
 
-        json += "{";
-        json += "\"id\":";
-        json += lampIndex + 1;
-
-        json += ",\"red\":";
-        json += state.lamps[lampIndex].red;
-
-        json += ",\"blue\":";
-        json += state.lamps[lampIndex].blue;
-
-        json += "}";
+        lamp["id"] = i + 1;
+        lamp["red"] = state.lamps[i].red;
+        lamp["blue"] = state.lamps[i].blue;
     }
 
-    json += "]}";
+    String output;
+
+    serializeJson(doc, output);
 
     server.send(
         200,
         "application/json",
-        json
+        output
     );
 }
 
@@ -164,19 +164,7 @@ void Api::handleSetBrightness(
         static_cast<uint8_t>(value)
     );
 
-    String json = "{";
-    json += "\"brightness\":";
-    json += lighting.getBrightness(
-        lamp,
-        channel
-    );
-    json += "}";
-
-    server.send(
-        200,
-        "application/json",
-        json
-    );
+    sendState(server);
 }
 
 bool Api::parseLamp(
