@@ -45,12 +45,44 @@ void WebServerManager::handleNotFound()
 void WebServerManager::handleFile()
 {
     String path = server.uri();
+    String gzPath = path + ".gz";
 
     if (path == "/")
     {
         path = "/index.html";
     }
 
+    // Сначала пробуем gzip-версию
+    if (LittleFS.exists(gzPath))
+    {
+        File file = LittleFS.open(gzPath, "r");
+
+        if (!file)
+        {
+            server.send(
+                500,
+                "text/plain",
+                "Failed to open file"
+            );
+
+            return;
+        }
+
+        server.sendHeader(
+            "Content-Encoding",
+            "gzip"
+        );
+
+        server.streamFile(
+            file,
+            getContentType(path)
+        );
+
+        file.close();
+        return;
+    }
+
+    // Fallback на обычный файл
     if (!LittleFS.exists(path))
     {
         server.send(
