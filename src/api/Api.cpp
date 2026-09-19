@@ -3,8 +3,12 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-Api::Api(Lighting& lighting)
-    : lighting(lighting)
+Api::Api(
+    Lighting& lighting,
+    SystemInfo& systemInfo
+)
+    : lighting(lighting),
+      systemInfo(systemInfo)
 {
 }
 
@@ -16,6 +20,13 @@ void Api::registerRoutes(WebServer& server)
         [this, &server]()
         {
             handleState(server);
+        }
+    );
+    server.on(
+        "/api/system",
+        HTTP_GET,
+        [&]() {
+            handleSystem(server);
         }
     );
 }
@@ -127,6 +138,11 @@ void Api::sendState(WebServer& server)
     );
 }
 
+void Api::handleSystem(WebServer& server)
+{
+    sendSystem(server);
+}
+
 void Api::handleSetBrightness(
     WebServer& server,
     Lamp lamp,
@@ -211,4 +227,46 @@ bool Api::parseChannel(
     }
 
     return false;
+}
+
+void Api::sendSystem(WebServer& server)
+{
+    const SystemInfoState state = systemInfo.getState();
+
+    JsonDocument doc;
+
+    doc["chipModel"] = state.chipModel;
+    doc["chipRevision"] = state.chipRevision;
+    doc["cpuCores"] = state.cpuCores;
+    doc["cpuFrequencyMhz"] = state.cpuFrequencyMhz;
+
+    doc["uptimeSeconds"] = state.uptimeSeconds;
+    doc["freeHeap"] = state.freeHeap;
+    doc["totalHeap"] = state.totalHeap;
+    doc["minimumFreeHeap"] = state.minimumFreeHeap;
+
+    doc["flashSize"] = state.flashSize;
+    doc["sketchSize"] = state.sketchSize;
+    doc["freeSketchSpace"] = state.freeSketchSpace;
+
+    doc["filesystemTotal"] = state.filesystemTotal;
+    doc["filesystemUsed"] = state.filesystemUsed;
+    doc["filesystemFree"] = state.filesystemFree;
+
+    doc["ip"] = state.ip;
+    doc["gateway"] = state.gateway;
+    doc["subnet"] = state.subnet;
+    doc["mac"] = state.mac;
+    doc["wifiRssi"] = state.wifiRssi;
+
+    doc["chipTemperature"] = state.chipTemperature;
+
+    String json;
+    serializeJson(doc, json);
+
+    server.send(
+        200,
+        "application/json",
+        json
+    );
 }

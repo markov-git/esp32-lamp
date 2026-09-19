@@ -7,11 +7,14 @@
 #include "lighting/Lighting.h"
 #include "fs/FileServer.h"
 #include "api/Api.h"
+#include "system/SystemInfo.h"
 
 WebServer server(80);
 
 Lighting lighting1;
-Api api(lighting1);
+SystemInfo systemInfo;
+
+Api api(lighting1, systemInfo);
 WebServerManager webServer(api);
 
 void setup() {

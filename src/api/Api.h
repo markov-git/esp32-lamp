@@ -4,19 +4,25 @@
 #include <ArduinoJson.h>
 
 #include "../lighting/Lighting.h"
+#include "../system/SystemInfo.h"
 
 class Api
 {
 public:
-    explicit Api(Lighting& lighting);
+    explicit Api(
+        Lighting& lighting,
+        SystemInfo& systemInfo
+    );
 
     void registerRoutes(WebServer& server);
     bool handleRequest(WebServer& server);
 
 private:
     Lighting& lighting;
+    SystemInfo& systemInfo;
 
     void handleState(WebServer& server);
+    void handleSystem(WebServer& server);
 
     void handleSetBrightness(
         WebServer& server,
@@ -25,6 +31,7 @@ private:
     );
 
     void sendState(WebServer& server);
+    void sendSystem(WebServer& server);
 
     bool parseLamp(
         const String& value,
