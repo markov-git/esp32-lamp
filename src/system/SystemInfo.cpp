@@ -44,9 +44,6 @@ SystemInfoState SystemInfo::getState() const
 
     state.filesystemTotal = LittleFS.totalBytes();
     state.filesystemUsed = LittleFS.usedBytes();
-    state.filesystemFree =
-        state.filesystemTotal -
-        state.filesystemUsed;
 
     // -------------------------
     // Wi-Fi
