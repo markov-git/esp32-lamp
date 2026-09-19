@@ -4,17 +4,21 @@
 
 #include "web/WebServerManager.h"
 #include "wifi/WiFi.h"
-#include "lighting/Lighting.h"
 #include "fs/FileServer.h"
 #include "api/Api.h"
+
+#include "lighting/Lighting.h"
 #include "system/SystemInfo.h"
+
+#include "sensors/Sensors.h"
 
 WebServer server(80);
 
 Lighting lighting1;
 SystemInfo systemInfo;
+Sensors sensors;
 
-Api api(lighting1, systemInfo);
+Api api(lighting1, systemInfo, sensors);
 WebServerManager webServer(api);
 
 void setup() {
@@ -24,6 +28,7 @@ void setup() {
     setupWiFi();
     lighting1.begin();
     webServer.begin();
+    sensors.begin();
 
     Serial.println("App started");
 }

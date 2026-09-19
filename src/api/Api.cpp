@@ -5,10 +5,12 @@
 
 Api::Api(
     Lighting& lighting,
-    SystemInfo& systemInfo
+    SystemInfo& systemInfo,
+    Sensors& sensors
 )
     : lighting(lighting),
-      systemInfo(systemInfo)
+    systemInfo(systemInfo),
+    sensors(sensors)
 {
 }
 
@@ -29,6 +31,13 @@ void Api::registerRoutes(WebServer& server)
             handleSystem(server);
         }
     );
+    server.on(
+    "/api/sensors",
+    HTTP_GET,
+    [&]() {
+        handleSensors(server);
+    }
+);
 }
 
 bool Api::handleRequest(WebServer& server)
@@ -141,6 +150,10 @@ void Api::sendState(WebServer& server)
 void Api::handleSystem(WebServer& server)
 {
     sendSystem(server);
+}
+void Api::handleSensors(WebServer& server)
+{
+    sendSensors(server);
 }
 
 void Api::handleSetBrightness(
@@ -260,6 +273,28 @@ void Api::sendSystem(WebServer& server)
     doc["wifiRssi"] = state.wifiRssi;
 
     doc["chipTemperature"] = state.chipTemperature;
+
+    String json;
+    serializeJson(doc, json);
+
+    server.send(
+        200,
+        "application/json",
+        json
+    );
+}
+
+void Api::sendSensors(WebServer& server)
+{
+    const SensorsState state = sensors.getState();
+
+    JsonDocument doc;
+
+    JsonObject bme280 = doc["bme280"].to<JsonObject>();
+
+    bme280["temperature"] = state.bme280.temperature;
+    bme280["humidity"] = state.bme280.humidity;
+    bme280["pressure"] = state.bme280.pressure;
 
     String json;
     serializeJson(doc, json);
