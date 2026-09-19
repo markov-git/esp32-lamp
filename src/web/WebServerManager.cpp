@@ -68,11 +68,6 @@ void WebServerManager::handleFile()
             return;
         }
 
-        server.sendHeader(
-            "Content-Encoding",
-            "gzip"
-        );
-
         server.streamFile(
             file,
             getContentType(path)
