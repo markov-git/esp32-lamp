@@ -6,19 +6,19 @@
 #include "wifi/WiFi.h"
 #include "fs/FileServer.h"
 #include "api/Api.h"
-
 #include "lighting/Lighting.h"
 #include "system/SystemInfo.h"
-
 #include "sensors/Sensors.h"
+#include "time/Rtc.h"
 
 WebServer server(80);
 
 Lighting lighting1;
 SystemInfo systemInfo;
 Sensors sensors;
+Rtc rtc;
 
-Api api(lighting1, systemInfo, sensors);
+Api api(lighting1, systemInfo, sensors, rtc);
 WebServerManager webServer(api);
 
 void setup() {
@@ -26,6 +26,7 @@ void setup() {
 
     setupFileServer();
     setupWiFi();
+    rtc.begin();
     lighting1.begin();
     webServer.begin();
     sensors.begin();

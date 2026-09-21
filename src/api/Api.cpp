@@ -6,11 +6,13 @@
 Api::Api(
     Lighting& lighting,
     SystemInfo& systemInfo,
-    Sensors& sensors
+    Sensors& sensors,
+    Rtc& rtc
 )
     : lighting(lighting),
     systemInfo(systemInfo),
-    sensors(sensors)
+    sensors(sensors),
+    rtc(rtc)
 {
 }
 
@@ -32,12 +34,26 @@ void Api::registerRoutes(WebServer& server)
         }
     );
     server.on(
-    "/api/sensors",
-    HTTP_GET,
-    [&]() {
-        handleSensors(server);
-    }
-);
+        "/api/sensors",
+        HTTP_GET,
+        [&]() {
+            handleSensors(server);
+        }
+    );
+    server.on(
+        "/api/time",
+        HTTP_GET,
+        [&]() {
+            handleTime(server);
+        }
+    );
+    server.on(
+        "/api/time",
+        HTTP_POST,
+        [&]() {
+            handleSetTime(server);
+        }
+    );
 }
 
 bool Api::handleRequest(WebServer& server)
@@ -135,6 +151,12 @@ void Api::sendState(WebServer& server)
         lamp["red"] = state.lamps[i].red;
         lamp["blue"] = state.lamps[i].blue;
     }
+
+    // Time
+    JsonObject time = doc["time"].to<JsonObject>();
+
+    time["unix"] = rtc.getDateTime().unixtime();
+    time["lostPower"] = rtc.lostPower();
 
     String output;
 
@@ -314,4 +336,74 @@ void Api::sendSensors(WebServer& server)
         "application/json",
         json
     );
+}
+void Api::handleTime(WebServer& server)
+{
+    sendTime(server);
+}
+
+void Api::sendTime(WebServer& server)
+{
+    const DateTime now = rtc.getDateTime();
+
+    JsonDocument doc;
+
+    doc["unix"] = now.unixtime();
+    doc["lostPower"] = rtc.lostPower();
+
+    String json;
+    serializeJson(doc, json);
+
+    server.send(
+        200,
+        "application/json",
+        json
+    );
+}
+
+void Api::handleSetTime(WebServer& server)
+{
+    if (!server.hasArg("plain"))
+    {
+        server.send(
+            400,
+            "application/json",
+            "{\"error\":\"Request body is required\"}"
+        );
+
+        return;
+    }
+
+    JsonDocument doc;
+
+    const DeserializationError error =
+        deserializeJson(doc, server.arg("plain"));
+
+    if (error)
+    {
+        server.send(
+            400,
+            "application/json",
+            "{\"error\":\"Invalid JSON\"}"
+        );
+
+        return;
+    }
+
+    if (!doc["unix"].is<uint64_t>())
+    {
+        server.send(
+            400,
+            "application/json",
+            "{\"error\":\"unix is required\"}"
+        );
+
+        return;
+    }
+
+    const uint64_t timestamp = doc["unix"];
+
+    rtc.setDateTime(DateTime(timestamp));
+
+    handleTime(server);
 }
