@@ -45,12 +45,13 @@ void WebServerManager::handleNotFound()
 void WebServerManager::handleFile()
 {
     String path = server.uri();
-    String gzPath = path + ".gz";
 
     if (path == "/")
     {
         path = "/index.html";
     }
+
+    String gzPath = path + ".gz";
 
     // Сначала пробуем gzip-версию
     if (LittleFS.exists(gzPath))
