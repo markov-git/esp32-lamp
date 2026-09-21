@@ -296,6 +296,16 @@ void Api::sendSensors(WebServer& server)
     bme280["humidity"] = state.bme280.humidity;
     bme280["pressure"] = state.bme280.pressure;
 
+    JsonArray soilMoisture = doc["soilMoisture"].to<JsonArray>();
+    for (uint8_t i = 0; i < SoilMoisture::SENSOR_COUNT; i++)
+    {
+        JsonObject soil = soilMoisture.add<JsonObject>();
+
+        soil["id"] = i;
+        soil["raw"] = state.soilMoisture.raw[i];
+        soil["percent"] = state.soilMoisture.percent[i];
+    }
+
     String json;
     serializeJson(doc, json);
 
