@@ -404,4 +404,6 @@ void Api::handleSetTime(WebServer& server)
     const uint64_t timestamp = doc["unix"];
 
     rtc.setDateTime(DateTime(timestamp));
+
+    sendTime(server);
 }

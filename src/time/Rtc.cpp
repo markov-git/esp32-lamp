@@ -2,6 +2,8 @@
 
 bool Rtc::begin()
 {
+    Wire.begin(SDA_PIN, SCL_PIN);
+
     if (!rtc.begin())
     {
         Serial.println("RTC initialization failed");

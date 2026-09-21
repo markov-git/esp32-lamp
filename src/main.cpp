@@ -26,10 +26,11 @@ void setup() {
 
     setupFileServer();
     setupWiFi();
-    rtc.begin();
+
     lighting1.begin();
     webServer.begin();
     sensors.begin();
+    rtc.begin();
 
     Serial.println("App started");
 }
