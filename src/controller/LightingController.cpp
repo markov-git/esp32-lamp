@@ -15,13 +15,34 @@ void LightingController::begin()
 {
     effectiveState = lighting.getState();
 
-    update();
+    update(true);
 }
 
 void LightingController::update()
 {
+    update(false);
+}
+
+void LightingController::update(bool force)
+{
     const DateTime now =
         rtc.getDateTime();
+
+    const int32_t currentScheduleMinute =
+        static_cast<int32_t>(
+            now.unixtime() / 60
+        );
+
+    if (
+        !force &&
+        currentScheduleMinute == lastScheduleMinute
+    )
+    {
+        return;
+    }
+
+    lastScheduleMinute =
+        currentScheduleMinute;
 
     const ScheduleState scheduleState =
         schedule.getState(now);
@@ -29,9 +50,11 @@ void LightingController::update()
     LightingState target =
         lighting.getManualState();
 
-    for (uint8_t lampIndex = 0;
-         lampIndex < Lighting::LAMP_COUNT;
-         lampIndex++)
+    for (
+        uint8_t lampIndex = 0;
+        lampIndex < Lighting::LAMP_COUNT;
+        lampIndex++
+    )
     {
         const Lamp lamp =
             static_cast<Lamp>(lampIndex);
@@ -65,7 +88,7 @@ bool LightingController::setManualBrightness(
         return false;
     }
 
-    update();
+    update(true);
 
     return true;
 }
@@ -80,7 +103,7 @@ void LightingController::setScheduleEnabled(
         enabled
     );
 
-    update();
+    update(true);
 }
 
 bool LightingController::isScheduleEnabled(

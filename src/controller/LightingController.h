@@ -45,6 +45,12 @@ private:
 
     LightingState effectiveState{};
 
+    // Минутный timestamp последнего расчёта расписания
+    // -1 означает "ещё не инициализирован"
+    int32_t lastScheduleMinute = -1;
+
+    void update(bool force);
+
     void applyState(
         const LightingState& state
     );
