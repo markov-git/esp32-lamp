@@ -1,19 +1,15 @@
 #include "Lighting.h"
 
-#include <Arduino.h>
-
 namespace
 {
-    constexpr int PWM_FREQUENCY = 1000;
-    constexpr uint8_t PWM_RESOLUTION = 8;
-
-    // Пока подключен только тестовый LED.
-    constexpr uint8_t TEST_PIN = 16;
-    constexpr uint8_t TEST_PWM_CHANNEL = 0;
+    constexpr uint8_t MAX_BRIGHTNESS = 100;
 }
 
 void Lighting::begin()
 {
+    manualState = {};
+    currentState = {};
+
     ledcSetup(
         TEST_PWM_CHANNEL,
         PWM_FREQUENCY,
@@ -25,71 +21,104 @@ void Lighting::begin()
         TEST_PWM_CHANNEL
     );
 
-    // Все каналы начинаются выключенными.
-    for (uint8_t lamp = 0; lamp < LAMP_COUNT; lamp++)
-    {
-        for (uint8_t channel = 0; channel < CHANNELS_PER_LAMP; channel++)
-        {
-            brightness[lamp][channel] = 0;
-        }
-    }
+    applyBrightness(
+        Lamp::Lamp1,
+        Channel::Red,
+        0
+    );
 }
 
-LightingState Lighting::getState() const
-{
-    LightingState state{};
-
-    for (uint8_t lamp = 0; lamp < LAMP_COUNT; lamp++)
-    {
-        state.lamps[lamp].red =
-            brightness[lamp][0];
-
-        state.lamps[lamp].blue =
-            brightness[lamp][1];
-    }
-
-    return state;
-}
-
-void Lighting::setBrightness(
+bool Lighting::setManualBrightness(
     Lamp lamp,
     Channel channel,
     uint8_t percent
 )
 {
-    percent = constrain(percent, 0, 100);
-
-    const uint8_t lampIndex = getLampIndex(lamp);
-    const uint8_t channelIndex = getChannelIndex(channel);
-
-    brightness[lampIndex][channelIndex] = percent;
-
-    // Пока физически существует только Lamp1 / Red.
-    if (
-        lamp == Lamp::Lamp1 &&
-        channel == Channel::Red
-    )
+    if (percent > MAX_BRIGHTNESS)
     {
-        const uint32_t duty =
-            map(percent, 0, 100, 0, 255);
-
-        ledcWrite(
-            TEST_PWM_CHANNEL,
-            duty
-        );
+        return false;
     }
+
+    const uint8_t lampIndex =
+        getLampIndex(lamp);
+
+    if (channel == Channel::Red)
+    {
+        manualState.lamps[lampIndex].red =
+            percent;
+    }
+    else
+    {
+        manualState.lamps[lampIndex].blue =
+            percent;
+    }
+
+    return true;
 }
 
-uint8_t Lighting::getBrightness(
+uint8_t Lighting::getManualBrightness(
     Lamp lamp,
     Channel channel
 ) const
 {
-    return brightness[
-        getLampIndex(lamp)
-    ][
-        getChannelIndex(channel)
-    ];
+    const uint8_t lampIndex =
+        getLampIndex(lamp);
+
+    if (channel == Channel::Red)
+    {
+        return manualState.lamps[lampIndex].red;
+    }
+
+    return manualState.lamps[lampIndex].blue;
+}
+
+LightingState Lighting::getManualState() const
+{
+    return manualState;
+}
+
+void Lighting::setState(
+    const LightingState& state
+)
+{
+    for (uint8_t lampIndex = 0;
+         lampIndex < LAMP_COUNT;
+         lampIndex++)
+    {
+        const Lamp lamp =
+            static_cast<Lamp>(lampIndex);
+
+        const LampState& current =
+            currentState.lamps[lampIndex];
+
+        const LampState& next =
+            state.lamps[lampIndex];
+
+        if (current.red != next.red)
+        {
+            applyBrightness(
+                lamp,
+                Channel::Red,
+                next.red
+            );
+        }
+
+        if (current.blue != next.blue)
+        {
+            applyBrightness(
+                lamp,
+                Channel::Blue,
+                next.blue
+            );
+        }
+    }
+
+    currentState = state;
+}
+
+LightingState Lighting::getState() const
+{
+    return currentState;
 }
 
 uint8_t Lighting::getLampIndex(Lamp lamp) const
@@ -100,4 +129,28 @@ uint8_t Lighting::getLampIndex(Lamp lamp) const
 uint8_t Lighting::getChannelIndex(Channel channel) const
 {
     return static_cast<uint8_t>(channel);
+}
+
+void Lighting::applyBrightness(
+    Lamp lamp,
+    Channel channel,
+    uint8_t percent
+)
+{
+    // Currently only the physical test channel exists.
+    if (
+        lamp == Lamp::Lamp1 &&
+        channel == Channel::Red
+    )
+    {
+        const uint8_t duty =
+            static_cast<uint16_t>(percent) *
+            255 /
+            100;
+
+        ledcWrite(
+            TEST_PWM_CHANNEL,
+            duty
+        );
+    }
 }

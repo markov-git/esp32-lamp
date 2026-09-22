@@ -2,8 +2,9 @@
 
 #include <WebServer.h>
 #include <ArduinoJson.h>
+#include <Arduino.h>
 
-#include "../lighting/Lighting.h"
+#include "../controller/LightingController.h"
 #include "../system/SystemInfo.h"
 #include "../sensors/Sensors.h"
 #include "../time/Rtc.h"
@@ -12,7 +13,7 @@ class Api
 {
 public:
     explicit Api(
-        Lighting& lighting,
+        LightingController& lightingController,
         SystemInfo& systemInfo,
         Sensors& sensors,
         Rtc& rtc
@@ -22,7 +23,7 @@ public:
     bool handleRequest(WebServer& server);
 
 private:
-    Lighting& lighting;
+    LightingController& lightingController;
     SystemInfo& systemInfo;
     Sensors& sensors;
     Rtc& rtc;
@@ -32,11 +33,6 @@ private:
     void handleSensors(WebServer& server);
     void handleTime(WebServer& server);
     
-    void handleSetBrightness(
-        WebServer& server,
-        Lamp lamp,
-        Channel channel
-    );
     void handleSetTime(WebServer& server);
 
     void sendState(WebServer& server);
@@ -44,13 +40,41 @@ private:
     void sendSensors(WebServer& server);
     void sendTime(WebServer& server);
 
+    void handleSetBrightness(
+        WebServer& server,
+        Lamp lamp,
+        Channel channel
+    );
+
+    void handleSetScheduleEnabled(
+        WebServer& server,
+        Lamp lamp
+    );
+
     bool parseLamp(
         const String& value,
         Lamp& lamp
-    );
+    ) const;
 
     bool parseChannel(
         const String& value,
         Channel& channel
+    ) const;
+
+    bool parseLampChannel(
+        const String& path,
+        Lamp& lamp,
+        Channel& channel
+    ) const;
+
+    bool parseLampSchedule(
+        const String& path,
+        Lamp& lamp
+    ) const;
+
+    void sendJsonError(
+        WebServer& server,
+        int statusCode,
+        const char* error
     );
 };

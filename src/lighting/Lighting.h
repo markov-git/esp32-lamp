@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <Arduino.h>
 
 enum class Lamp : uint8_t
 {
@@ -24,6 +25,31 @@ struct LampState
 struct LightingState
 {
     LampState lamps[3];
+
+    bool operator==(
+        const LightingState& other
+    ) const
+    {
+        for (uint8_t i = 0; i < 3; i++)
+        {
+            if (
+                lamps[i].red != other.lamps[i].red ||
+                lamps[i].blue != other.lamps[i].blue
+            )
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool operator!=(
+        const LightingState& other
+    ) const
+    {
+        return !(*this == other);
+    }
 };
 
 class Lighting
@@ -33,24 +59,43 @@ public:
 
     void begin();
 
-    void setBrightness(
+    bool setManualBrightness(
         Lamp lamp,
         Channel channel,
         uint8_t percent
     );
 
-    uint8_t getBrightness(
+    uint8_t getManualBrightness(
         Lamp lamp,
         Channel channel
     ) const;
+
+    LightingState getManualState() const;
+
+    void setState(
+        const LightingState& state
+    );
 
     LightingState getState() const;
 
 private:
     static constexpr uint8_t CHANNELS_PER_LAMP = 2;
 
-    uint8_t brightness[LAMP_COUNT][CHANNELS_PER_LAMP] = {};
+    static constexpr uint32_t PWM_FREQUENCY = 1000;
+    static constexpr uint8_t PWM_RESOLUTION = 8;
+
+    static constexpr uint8_t TEST_PIN = 16;
+    static constexpr uint8_t TEST_PWM_CHANNEL = 0;
+
+    LightingState manualState{};
+    LightingState currentState{};
 
     uint8_t getLampIndex(Lamp lamp) const;
     uint8_t getChannelIndex(Channel channel) const;
+
+    void applyBrightness(
+        Lamp lamp,
+        Channel channel,
+        uint8_t percent
+    );
 };

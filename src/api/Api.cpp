@@ -1,15 +1,12 @@
 #include "Api.h"
 
-#include <Arduino.h>
-#include <ArduinoJson.h>
-
 Api::Api(
-    Lighting& lighting,
+    LightingController& lightingController,
     SystemInfo& systemInfo,
     Sensors& sensors,
     Rtc& rtc
 )
-    : lighting(lighting),
+    : lightingController(lightingController),
     systemInfo(systemInfo),
     sensors(sensors),
     rtc(rtc)
@@ -58,76 +55,89 @@ void Api::registerRoutes(WebServer& server)
 
 bool Api::handleRequest(WebServer& server)
 {
-    const String uri = server.uri();
+    const String path = server.uri();
 
-    if (!uri.startsWith("/api/lamp/"))
+    if (!path.startsWith("/api/"))
     {
         return false;
     }
 
-    // /api/lamp/1/red
-    String path = uri.substring(
-        String("/api/lamp/").length()
-    );
-
-    const int separator = path.indexOf('/');
-
-    if (separator < 0)
+    if (
+        path == "/api/state" &&
+        server.method() == HTTP_GET
+    )
     {
-        server.send(
-            400,
-            "application/json",
-            R"({"error":"invalid lamp endpoint"})"
-        );
-
+        handleState(server);
         return true;
     }
 
-    const String lampValue =
-        path.substring(0, separator);
+    if (
+        path == "/api/system" &&
+        server.method() == HTTP_GET
+    )
+    {
+        handleSystem(server);
+        return true;
+    }
 
-    const String channelValue =
-        path.substring(separator + 1);
+    if (
+        path == "/api/sensors" &&
+        server.method() == HTTP_GET
+    )
+    {
+        handleSensors(server);
+        return true;
+    }
+
+    if (
+        path == "/api/time" &&
+        server.method() == HTTP_GET
+    )
+    {
+        handleTime(server);
+        return true;
+    }
+
+    if (
+        path == "/api/time" &&
+        server.method() == HTTP_POST
+    )
+    {
+        handleSetTime(server);
+        return true;
+    }
 
     Lamp lamp;
     Channel channel;
 
-    if (!parseLamp(lampValue, lamp))
+    if (
+        server.method() == HTTP_POST &&
+        parseLampChannel(path, lamp, channel)
+    )
     {
-        server.send(
-            400,
-            "application/json",
-            R"({"error":"invalid lamp"})"
+        handleSetBrightness(
+            server,
+            lamp,
+            channel
         );
 
         return true;
     }
 
-    if (!parseChannel(channelValue, channel))
+    if (
+        server.method() == HTTP_POST &&
+        parseLampSchedule(path, lamp)
+    )
     {
-        server.send(
-            400,
-            "application/json",
-            R"({"error":"invalid channel"})"
+        handleSetScheduleEnabled(
+            server,
+            lamp
         );
 
         return true;
     }
 
-    if (server.method() != HTTP_POST)
-    {
-        server.send(
-            405,
-            "application/json",
-            R"({"error":"method not allowed"})"
-        );
-
-        return true;
-    }
-
-    handleSetBrightness(server, lamp, channel);
-
-    return true;
+    return false;
 }
 
 void Api::handleState(WebServer& server)
@@ -137,7 +147,8 @@ void Api::handleState(WebServer& server)
 
 void Api::sendState(WebServer& server)
 {
-    const LightingState state = lighting.getState();
+    const LightingState effectiveState = lightingController.getEffectiveState();
+    const LightingState manualState = lightingController.getManualState();
 
     JsonDocument doc;
 
@@ -148,8 +159,26 @@ void Api::sendState(WebServer& server)
         JsonObject lamp = lamps.add<JsonObject>();
 
         lamp["id"] = i + 1;
-        lamp["red"] = state.lamps[i].red;
-        lamp["blue"] = state.lamps[i].blue;
+
+        JsonObject current =
+            lamp["current"].to<JsonObject>();
+
+        current["red"] = effectiveState.lamps[i].red;
+        current["blue"] = effectiveState.lamps[i].blue;
+
+        JsonObject manual =
+            lamp["manual"].to<JsonObject>();
+
+        manual["red"] =
+            manualState.lamps[i].red;
+
+        manual["blue"] =
+            manualState.lamps[i].blue;
+
+        lamp["scheduleEnabled"] =
+            lightingController.isScheduleEnabled(
+                static_cast<Lamp>(i)
+            );
     }
 
     // Time
@@ -209,10 +238,72 @@ void Api::handleSetBrightness(
         return;
     }
 
-    lighting.setBrightness(
+    bool setResult = lightingController.setManualBrightness(
         lamp,
         channel,
         static_cast<uint8_t>(value)
+    );
+    if (!setResult)
+    {
+        server.send(
+            409,
+            "application/json",
+            "{\"error\":\"schedule_enabled\"}"
+        );
+
+        return;
+    }
+    
+
+    sendState(server);
+}
+
+void Api::handleSetScheduleEnabled(
+    WebServer& server,
+    Lamp lamp
+)
+{
+    if (!server.hasArg("enabled"))
+    {
+        sendJsonError(
+            server,
+            400,
+            "missing_enabled"
+        );
+
+        return;
+    }
+
+    const String value =
+        server.arg("enabled");
+
+    bool enabled;
+
+    if (value == "true" || value == "1")
+    {
+        enabled = true;
+    }
+    else if (
+        value == "false" ||
+        value == "0"
+    )
+    {
+        enabled = false;
+    }
+    else
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_enabled"
+        );
+
+        return;
+    }
+
+    lightingController.setScheduleEnabled(
+        lamp,
+        enabled
     );
 
     sendState(server);
@@ -221,7 +312,7 @@ void Api::handleSetBrightness(
 bool Api::parseLamp(
     const String& value,
     Lamp& lamp
-)
+) const
 {
     if (value == "1")
     {
@@ -247,7 +338,7 @@ bool Api::parseLamp(
 bool Api::parseChannel(
     const String& value,
     Channel& channel
-)
+) const
 {
     if (value == "red")
     {
@@ -262,6 +353,91 @@ bool Api::parseChannel(
     }
 
     return false;
+}
+
+bool Api::parseLampChannel(
+    const String& path,
+    Lamp& lamp,
+    Channel& channel
+) const
+{
+    if (!path.startsWith("/api/lamp/"))
+    {
+        return false;
+    }
+
+    const String prefix = "/api/lamp/";
+
+    String remainder =
+        path.substring(prefix.length());
+
+    const int slashIndex =
+        remainder.indexOf('/');
+
+    if (slashIndex <= 0)
+    {
+        return false;
+    }
+
+    const String lampPart =
+        remainder.substring(
+            0,
+            slashIndex
+        );
+
+    const String channelPart =
+        remainder.substring(
+            slashIndex + 1
+        );
+
+    if (!parseLamp(
+            lampPart,
+            lamp))
+    {
+        return false;
+    }
+
+    return parseChannel(
+        channelPart,
+        channel
+    );
+}
+
+bool Api::parseLampSchedule(
+    const String& path,
+    Lamp& lamp
+) const
+{
+    const String prefix =
+        "/api/lamp/";
+
+    if (!path.startsWith(prefix))
+    {
+        return false;
+    }
+
+    String remainder =
+        path.substring(prefix.length());
+
+    const String suffix =
+        "/schedule";
+
+    if (!remainder.endsWith(suffix))
+    {
+        return false;
+    }
+
+    remainder =
+        remainder.substring(
+            0,
+            remainder.length() -
+                suffix.length()
+        );
+
+    return parseLamp(
+        remainder,
+        lamp
+    );
 }
 
 void Api::sendSystem(WebServer& server)
@@ -406,4 +582,25 @@ void Api::handleSetTime(WebServer& server)
     rtc.setDateTime(DateTime(timestamp));
 
     sendTime(server);
+}
+
+void Api::sendJsonError(
+    WebServer& server,
+    int statusCode,
+    const char* error
+)
+{
+    JsonDocument doc;
+
+    doc["error"] = error;
+
+    String response;
+
+    serializeJson(doc, response);
+
+    server.send(
+        statusCode,
+        "application/json",
+        response
+    );
 }

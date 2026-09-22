@@ -7,18 +7,32 @@
 #include "fs/FileServer.h"
 #include "api/Api.h"
 #include "lighting/Lighting.h"
+#include "schedule/Schedule.h"
 #include "system/SystemInfo.h"
 #include "sensors/Sensors.h"
 #include "time/Rtc.h"
+#include "controller/LightingController.h"
 
 WebServer server(80);
 
-Lighting lighting1;
+Lighting lighting;
+Schedule schedule;
 SystemInfo systemInfo;
 Sensors sensors;
 Rtc rtc;
 
-Api api(lighting1, systemInfo, sensors, rtc);
+LightingController lightingController(
+    lighting,
+    schedule,
+    rtc
+);
+
+Api api(
+    lightingController,
+    systemInfo,
+    sensors,
+    rtc
+);
 WebServerManager webServer(api);
 
 void setup() {
@@ -27,10 +41,11 @@ void setup() {
     setupFileServer();
     setupWiFi();
 
-    lighting1.begin();
+    lighting.begin();
     webServer.begin();
     sensors.begin();
     rtc.begin();
+    lightingController.begin();
 
     Serial.println("App started");
 }
@@ -38,4 +53,6 @@ void setup() {
 void loop()
 {
     webServer.handleClient();
+
+    lightingController.update();
 }
