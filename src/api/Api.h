@@ -19,7 +19,6 @@ public:
         Rtc& rtc
     );
 
-    void registerRoutes(WebServer& server);
     bool handleRequest(WebServer& server);
 
 private:

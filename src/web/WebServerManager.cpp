@@ -12,8 +12,6 @@ WebServerManager::WebServerManager(Api& api)
 
 void WebServerManager::begin()
 {
-    api.registerRoutes(server);
-
     server.onNotFound(
         [this]()
         {

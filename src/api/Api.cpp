@@ -13,46 +13,6 @@ Api::Api(
 {
 }
 
-void Api::registerRoutes(WebServer& server)
-{
-    server.on(
-        "/api/state",
-        HTTP_GET,
-        [this, &server]()
-        {
-            handleState(server);
-        }
-    );
-    server.on(
-        "/api/system",
-        HTTP_GET,
-        [&]() {
-            handleSystem(server);
-        }
-    );
-    server.on(
-        "/api/sensors",
-        HTTP_GET,
-        [&]() {
-            handleSensors(server);
-        }
-    );
-    server.on(
-        "/api/time",
-        HTTP_GET,
-        [&]() {
-            handleTime(server);
-        }
-    );
-    server.on(
-        "/api/time",
-        HTTP_POST,
-        [&]() {
-            handleSetTime(server);
-        }
-    );
-}
-
 bool Api::handleRequest(WebServer& server)
 {
     const String path = server.uri();
