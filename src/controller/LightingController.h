@@ -23,6 +23,18 @@ public:
         uint8_t percent
     );
 
+    ScheduleError addScheduleEntry(
+        Lamp lamp,
+        Channel channel,
+        const ScheduleEntry& entry
+    );
+
+    bool deleteScheduleEntry(
+        Lamp lamp,
+        Channel channel,
+        uint8_t index
+    );
+
     void setScheduleEnabled(
         Lamp lamp,
         bool enabled

@@ -69,6 +69,33 @@ void Api::registerRoutes(WebServer& server)
             handleSetScheduleEnabled(server);
         }
     );
+
+    server.on(
+        "/api/schedules",
+        HTTP_GET,
+        [this, &server]()
+        {
+            handleSchedules(server);
+        }
+    );
+
+    server.on(
+        "/api/schedules/add",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleAddSchedule(server);
+        }
+    );
+
+    server.on(
+        "/api/schedules/delete",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleDeleteSchedule(server);
+        }
+    );
 }
 
 void Api::handleState(WebServer& server)
@@ -199,15 +226,15 @@ bool Api::parseLamp(
 
     switch (number)
     {
-        case 1:
+        case 0:
             lamp = Lamp::Lamp1;
             return true;
 
-        case 2:
+        case 1:
             lamp = Lamp::Lamp2;
             return true;
 
-        case 3:
+        case 2:
             lamp = Lamp::Lamp3;
             return true;
 
@@ -449,6 +476,281 @@ void Api::handleSetManualBrightness(
     sendState(server);
 }
 
+void Api::handleSchedules(WebServer& server)
+{
+    JsonDocument doc;
+
+    JsonArray lamps = doc["lamps"].to<JsonArray>();
+
+    for (uint8_t i = 0; i < Lighting::LAMP_COUNT; i++)
+    {
+        const Lamp lamp =
+            static_cast<Lamp>(i);
+
+        const LampSchedule& schedule =
+            lightingController.getSchedule().getSchedule(lamp);
+
+        JsonObject lampObject =
+            lamps.add<JsonObject>();
+
+        lampObject["id"] = i;
+
+        lampObject["enabled"] =
+            schedule.enabled;
+
+        JsonArray red =
+            lampObject["red"].to<JsonArray>();
+
+        for (uint8_t j = 0; j < schedule.redCount; j++)
+        {
+            JsonObject entry =
+                red.add<JsonObject>();
+
+            entry["days"] =
+                schedule.red[j].days;
+
+            entry["start"] =
+                schedule.red[j].startMinute;
+
+            entry["end"] =
+                schedule.red[j].endMinute;
+
+            entry["brightness"] =
+                schedule.red[j].brightness;
+
+            entry["fadeIn"] =
+                schedule.red[j].fadeInMinutes;
+
+            entry["fadeOut"] =
+                schedule.red[j].fadeOutMinutes;
+        }
+
+        JsonArray blue =
+            lampObject["blue"].to<JsonArray>();
+
+        for (uint8_t j = 0; j < schedule.blueCount; j++)
+        {
+            JsonObject entry =
+                blue.add<JsonObject>();
+
+            entry["days"] =
+                schedule.blue[j].days;
+
+            entry["start"] =
+                schedule.blue[j].startMinute;
+
+            entry["end"] =
+                schedule.blue[j].endMinute;
+
+            entry["brightness"] =
+                schedule.blue[j].brightness;
+
+            entry["fadeIn"] =
+                schedule.blue[j].fadeInMinutes;
+
+            entry["fadeOut"] =
+                schedule.blue[j].fadeOutMinutes;
+        }
+    }
+
+    String response;
+
+    serializeJson(doc, response);
+
+    server.send(
+        200,
+        "application/json",
+        response
+    );
+}
+
+void Api::handleAddSchedule(WebServer& server)
+{
+    JsonDocument doc;
+
+    if (!parseJsonBody(server, doc))
+        return;
+
+    Lamp lamp;
+    if (!parseLamp(doc["lamp"], lamp))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_lamp"
+        );
+
+        return;
+    }
+
+    Channel channel;
+    if (!parseChannel(doc["channel"], channel))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_channel"
+        );
+
+        return;
+    }
+
+    ScheduleEntry entry;
+
+    if (!parseScheduleEntry(doc["entry"], entry))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_entry"
+        );
+
+        return;
+    }
+
+    const ScheduleError error =
+        lightingController.addScheduleEntry(
+            lamp,
+            channel,
+            entry
+        );
+
+    if (error != ScheduleError::None)
+    {
+        switch (error)
+        {
+            case ScheduleError::InvalidDays:
+                sendJsonError(
+                    server,
+                    400,
+                    "invalid_days"
+                );
+                return;
+
+            case ScheduleError::InvalidTime:
+                sendJsonError(
+                    server,
+                    400,
+                    "invalid_time"
+                );
+                return;
+
+            case ScheduleError::InvalidBrightness:
+                sendJsonError(
+                    server,
+                    400,
+                    "invalid_brightness"
+                );
+                return;
+
+            case ScheduleError::InvalidFade:
+                sendJsonError(
+                    server,
+                    400,
+                    "invalid_fade"
+                );
+                return;
+
+            case ScheduleError::MaxEntries:
+                sendJsonError(
+                    server,
+                    409,
+                    "max_entries"
+                );
+                return;
+
+            case ScheduleError::Overlap:
+                sendJsonError(
+                    server,
+                    409,
+                    "overlap"
+                );
+                return;
+
+            case ScheduleError::None:
+                break;
+        }
+    }
+
+    handleSchedules(server);
+}
+
+void Api::handleDeleteSchedule(WebServer& server)
+{
+    JsonDocument doc;
+
+    if (!parseJsonBody(server, doc))
+        return;
+
+    Lamp lamp;
+
+    if (!parseLamp(doc["lamp"], lamp))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_lamp"
+        );
+
+        return;
+    }
+
+    Channel channel;
+
+    if (!parseChannel(doc["channel"], channel))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_channel"
+        );
+
+        return;
+    }
+
+    if (!doc["index"].is<int>())
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_index"
+        );
+
+        return;
+    }
+
+    const int index =
+        doc["index"].as<int>();
+
+    if (index < 0 || index >= Schedule::MAX_ENTRIES_PER_CHANNEL)
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_index"
+        );
+
+        return;
+    }
+
+    if (!lightingController.deleteScheduleEntry(
+        lamp,
+        channel,
+        static_cast<uint8_t>(index)
+    ))
+    {
+        sendJsonError(
+            server,
+            404,
+            "entry_not_found"
+        );
+
+        return;
+    }
+
+    handleSchedules(server);
+}
+
 void Api::sendJsonError(
     WebServer& server,
     int statusCode,
@@ -502,6 +804,80 @@ bool Api::parseJsonBody(
 
         return false;
     }
+
+    return true;
+}
+
+bool Api::parseScheduleEntry(
+    JsonVariantConst value,
+    ScheduleEntry& entry
+)
+{
+    if (!value.is<JsonObjectConst>())
+        return false;
+
+    JsonObjectConst object =
+        value.as<JsonObjectConst>();
+
+    if (
+        !object["days"].is<int>() ||
+        !object["start"].is<int>() ||
+        !object["end"].is<int>() ||
+        !object["brightness"].is<int>() ||
+        !object["fadeIn"].is<int>() ||
+        !object["fadeOut"].is<int>()
+    )
+    {
+        return false;
+    }
+
+    const int days =
+        object["days"].as<int>();
+
+    const int start =
+        object["start"].as<int>();
+
+    const int end =
+        object["end"].as<int>();
+
+    const int brightness =
+        object["brightness"].as<int>();
+
+    const int fadeIn =
+        object["fadeIn"].as<int>();
+
+    const int fadeOut =
+        object["fadeOut"].as<int>();
+
+    if (
+        days < 0 || days > 127 ||
+        start < 0 || start > 1440 ||
+        end < 0 || end > 1440 ||
+        brightness < 0 || brightness > 100 ||
+        fadeIn < 0 || fadeIn > 1440 ||
+        fadeOut < 0 || fadeOut > 1440
+    )
+    {
+        return false;
+    }
+
+    entry.days =
+        static_cast<uint8_t>(days);
+
+    entry.startMinute =
+        static_cast<uint16_t>(start);
+
+    entry.endMinute =
+        static_cast<uint16_t>(end);
+
+    entry.brightness =
+        static_cast<uint8_t>(brightness);
+
+    entry.fadeInMinutes =
+        static_cast<uint16_t>(fadeIn);
+
+    entry.fadeOutMinutes =
+        static_cast<uint16_t>(fadeOut);
 
     return true;
 }

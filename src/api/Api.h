@@ -35,7 +35,12 @@ private:
     void handleSetTime(WebServer& server);
 
     void handleSetManualBrightness(WebServer& server);
+
     void handleSetScheduleEnabled(WebServer& server);
+
+    void handleSchedules(WebServer& server);
+    void handleAddSchedule(WebServer& server);
+    void handleDeleteSchedule(WebServer& server);
 
     void sendState(WebServer& server);
     void sendSystem(WebServer& server);
@@ -56,6 +61,11 @@ private:
         JsonVariantConst value,
         Channel& channel
     ) const;
+
+    bool parseScheduleEntry(
+        JsonVariantConst value,
+        ScheduleEntry& entry
+    );
 
     void sendJsonError(
         WebServer& server,

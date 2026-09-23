@@ -22,120 +22,72 @@ void Schedule::clear()
     }
 }
 
-bool Schedule::addEntry(
+ScheduleError Schedule::addEntry(
     Lamp lamp,
     Channel channel,
     const ScheduleEntry& entry
 )
 {
-    const uint8_t lampIndex = getLampIndex(lamp);
-    LampSchedule& schedule = schedules[lampIndex];
+    if (entry.days == 0 || entry.days > 127)
+        return ScheduleError::InvalidDays;
 
-     // At least one day must be selected.
-    if (entry.days == 0)
+    if (
+        entry.startMinute >= entry.endMinute ||
+        entry.endMinute > 1440
+    )
     {
-        return false;
+        return ScheduleError::InvalidTime;
     }
 
-    // Only 7 days are valid.
-    if (entry.days & ~DAYS_MASK)
-    {
-        return false;
-    }
-
-    // Interval must be inside one day.
-    if (entry.startMinute >= MINUTES_PER_DAY)
-    {
-        return false;
-    }
-
-    if (entry.endMinute > MINUTES_PER_DAY)
-    {
-        return false;
-    }
-
-    // Midnight crossing is not supported.
-    if (entry.startMinute >= entry.endMinute)
-    {
-        return false;
-    }
-
-    // Brightness must be 0..100%.
     if (entry.brightness > 100)
-    {
-        return false;
-    }
+        return ScheduleError::InvalidBrightness;
 
     const uint16_t duration =
         entry.endMinute - entry.startMinute;
 
-    // Fade cannot be longer than the interval.
-    if (entry.fadeInMinutes > duration)
+    if (
+        entry.fadeInMinutes > duration ||
+        entry.fadeOutMinutes > duration
+    )
     {
-        return false;
+        return ScheduleError::InvalidFade;
     }
 
-    if (entry.fadeOutMinutes > duration)
-    {
-        return false;
-    }
+    const uint8_t lampIndex = getLampIndex(lamp);
+
+    ScheduleEntry* entries = nullptr;
+    uint8_t* count = nullptr;
 
     if (channel == Channel::Red)
     {
-        if (schedule.redCount >= MAX_ENTRIES_PER_CHANNEL)
-        {
-            return false;
-        }
-
-        // Check overlap with existing red entries.
-        for (uint8_t i = 0; i < schedule.redCount; i++)
-        {
-            const ScheduleEntry& existing =
-                schedule.red[i];
-
-            // Overlap only matters on common days.
-            if ((existing.days & entry.days) == 0)
-            {
-                continue;
-            }
-
-            if (hasOverlap(existing, entry))
-            {
-                return false;
-            }
-        }
-
-        schedule.red[schedule.redCount++] = entry;
-        return true;
+        entries = schedules[lampIndex].red;
+        count = &schedules[lampIndex].redCount;
     }
-
-    if (schedule.blueCount >= MAX_ENTRIES_PER_CHANNEL)
+    else
     {
-        return false;
+        entries = schedules[lampIndex].blue;
+        count = &schedules[lampIndex].blueCount;
     }
 
-    // Check overlap with existing blue entries.
-    for (uint8_t i = 0; i < schedule.blueCount; i++)
+    if (*count >= MAX_ENTRIES_PER_CHANNEL)
+        return ScheduleError::MaxEntries;
+
+    for (uint8_t i = 0; i < *count; i++)
     {
-        const ScheduleEntry& existing =
-            schedule.blue[i];
-
-        if ((existing.days & entry.days) == 0)
+        if (
+            (entry.days & entries[i].days) != 0 &&
+            hasOverlap(entry, entries[i])
+        )
         {
-            continue;
-        }
-
-        if (hasOverlap(existing, entry))
-        {
-            return false;
+            return ScheduleError::Overlap;
         }
     }
 
-    schedule.blue[schedule.blueCount++] = entry;
+    entries[*count] = entry;
+    (*count)++;
 
-    return true;
+    return ScheduleError::None;
 }
-
 bool Schedule::removeEntry(
     Lamp lamp,
     Channel channel,
@@ -143,40 +95,30 @@ bool Schedule::removeEntry(
 )
 {
     const uint8_t lampIndex = getLampIndex(lamp);
-    LampSchedule& schedule = schedules[lampIndex];
+
+    ScheduleEntry* entries = nullptr;
+    uint8_t* count = nullptr;
 
     if (channel == Channel::Red)
     {
-        if (index >= schedule.redCount)
-        {
-            return false;
-        }
-
-        for (uint8_t i = index;
-             i + 1 < schedule.redCount;
-             i++)
-        {
-            schedule.red[i] = schedule.red[i + 1];
-        }
-
-        schedule.redCount--;
-
-        return true;
+        entries = schedules[lampIndex].red;
+        count = &schedules[lampIndex].redCount;
+    }
+    else
+    {
+        entries = schedules[lampIndex].blue;
+        count = &schedules[lampIndex].blueCount;
     }
 
-    if (index >= schedule.blueCount)
-    {
+    if (index >= *count)
         return false;
-    }
 
-    for (uint8_t i = index;
-         i + 1 < schedule.blueCount;
-         i++)
+    for (uint8_t i = index; i + 1 < *count; i++)
     {
-        schedule.blue[i] = schedule.blue[i + 1];
+        entries[i] = entries[i + 1];
     }
 
-    schedule.blueCount--;
+    (*count)--;
 
     return true;
 }
@@ -192,6 +134,11 @@ void Schedule::setEnabled(
 bool Schedule::isEnabled(Lamp lamp) const
 {
     return schedules[getLampIndex(lamp)].enabled;
+}
+
+const LampSchedule& Schedule::getSchedule(Lamp lamp) const
+{
+    return schedules[getLampIndex(lamp)];
 }
 
 ScheduleState Schedule::getState(

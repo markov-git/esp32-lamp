@@ -34,6 +34,17 @@ struct ScheduleState
     LampState lamps[Lighting::LAMP_COUNT];
 };
 
+enum class ScheduleError
+{
+    None,
+    InvalidDays,
+    InvalidTime,
+    InvalidBrightness,
+    InvalidFade,
+    MaxEntries,
+    Overlap
+};
+
 class Schedule
 {
 public:
@@ -43,7 +54,7 @@ public:
 
     void clear();
 
-    bool addEntry(
+    ScheduleError addEntry(
         Lamp lamp,
         Channel channel,
         const ScheduleEntry& entry
@@ -58,6 +69,8 @@ public:
     void setEnabled(Lamp lamp, bool enabled);
 
     bool isEnabled(Lamp lamp) const;
+
+    const LampSchedule& getSchedule(Lamp lamp) const;
 
     ScheduleState getState(const DateTime& now) const;
 

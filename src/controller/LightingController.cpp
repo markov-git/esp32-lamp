@@ -93,6 +93,41 @@ bool LightingController::setManualBrightness(
     return true;
 }
 
+ScheduleError LightingController::addScheduleEntry(
+    Lamp lamp,
+    Channel channel,
+    const ScheduleEntry& entry
+)
+{
+    const ScheduleError error =
+        schedule.addEntry(
+            lamp,
+            channel,
+            entry
+        );
+
+    if (error != ScheduleError::None)
+        return error;
+
+    update(true);
+
+    return ScheduleError::None;
+}
+
+bool LightingController::deleteScheduleEntry(
+    Lamp lamp,
+    Channel channel,
+    uint8_t index
+)
+{
+    if (!schedule.removeEntry(lamp, channel, index))
+        return false;
+
+    update(true);
+
+    return true;
+}
+
 void LightingController::setScheduleEnabled(
     Lamp lamp,
     bool enabled
