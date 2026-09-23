@@ -226,15 +226,15 @@ bool Api::parseLamp(
 
     switch (number)
     {
-        case 0:
+        case 1:
             lamp = Lamp::Lamp1;
             return true;
 
-        case 1:
+        case 2:
             lamp = Lamp::Lamp2;
             return true;
 
-        case 2:
+        case 3:
             lamp = Lamp::Lamp3;
             return true;
 
@@ -330,7 +330,7 @@ void Api::sendSensors(WebServer& server)
     {
         JsonObject soil = soilMoisture.add<JsonObject>();
 
-        soil["id"] = i;
+        soil["id"] = i + 1;
         soil["raw"] = state.soilMoisture.raw[i];
         soil["percent"] = state.soilMoisture.percent[i];
     }
@@ -493,7 +493,7 @@ void Api::handleSchedules(WebServer& server)
         JsonObject lampObject =
             lamps.add<JsonObject>();
 
-        lampObject["id"] = i;
+        lampObject["id"] = i + 1;
 
         lampObject["enabled"] =
             schedule.enabled;
