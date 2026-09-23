@@ -1,22 +1,22 @@
 #pragma once
 
 #include <WebServer.h>
-#include <Arduino.h>
-#include <LittleFS.h>
-
-class Api;
 
 class WebServerManager
 {
 public:
+    explicit WebServerManager(WebServer& server);
+
     void begin();
-    void handleClient();
 
 private:
-    WebServer server;
+    WebServer& server;
 
+    void registerRoutes();
+
+    void handleRoot();
+    void handleStaticFile();
     void handleNotFound();
-    void handleFile();
 
     String getContentType(const String& path);
 };

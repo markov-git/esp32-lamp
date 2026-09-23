@@ -1,36 +1,65 @@
 #include "WebServerManager.h"
 
+#include <LittleFS.h>
+
+WebServerManager::WebServerManager(WebServer& server)
+    : server(server)
+{
+}
+
 void WebServerManager::begin()
 {
+    registerRoutes();
+
+    Serial.println("Web server started");
+}
+
+void WebServerManager::registerRoutes()
+{
+    server.on(
+        "/",
+        HTTP_GET,
+        [this]()
+        {
+            handleRoot();
+        }
+    );
+
     server.onNotFound(
         [this]()
         {
             handleNotFound();
         }
     );
-
-    Serial.println("Web server started");
 }
 
-void WebServerManager::handleClient()
+void WebServerManager::handleRoot()
 {
-    server.handleClient();
+    File file = LittleFS.open("/index.html", "r");
+
+    if (!file)
+    {
+        server.send(
+            500,
+            "text/plain",
+            "index.html not found"
+        );
+
+        return;
+    }
+
+    server.streamFile(file, "text/html");
+    file.close();
 }
 
 void WebServerManager::handleNotFound()
 {
-    handleFile();
+    handleStaticFile();
 }
 
-void WebServerManager::handleFile()
+void WebServerManager::handleStaticFile()
 {
     String path = server.uri();
-
-    if (path == "/")
-    {
-        path = "/index.html";
-    }
-
     String gzPath = path + ".gz";
 
     // Сначала пробуем gzip-версию

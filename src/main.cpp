@@ -33,7 +33,7 @@ Api api(
     sensors,
     rtc
 );
-WebServerManager webServer;
+WebServerManager webServer(server);
 
 void setup() {
     Serial.begin(115200);
@@ -55,7 +55,7 @@ void setup() {
 
 void loop()
 {
-    webServer.handleClient();
+    server.handleClient();
 
     lightingController.update();
 }
