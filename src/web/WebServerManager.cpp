@@ -1,15 +1,5 @@
 #include "WebServerManager.h"
 
-#include <Arduino.h>
-#include <LittleFS.h>
-
-#include "../api/Api.h"
-
-WebServerManager::WebServerManager(Api& api)
-    : api(api)
-{
-}
-
 void WebServerManager::begin()
 {
     server.onNotFound(
@@ -18,8 +8,6 @@ void WebServerManager::begin()
             handleNotFound();
         }
     );
-
-    server.begin();
 
     Serial.println("Web server started");
 }
@@ -31,12 +19,6 @@ void WebServerManager::handleClient()
 
 void WebServerManager::handleNotFound()
 {
-    if (server.uri().startsWith("/api/"))
-    {
-        api.handleRequest(server);
-        return;
-    }
-
     handleFile();
 }
 

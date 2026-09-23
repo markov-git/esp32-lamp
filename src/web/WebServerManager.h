@@ -1,20 +1,19 @@
 #pragma once
 
 #include <WebServer.h>
+#include <Arduino.h>
+#include <LittleFS.h>
 
 class Api;
 
 class WebServerManager
 {
 public:
-    explicit WebServerManager(Api& api);
-
     void begin();
     void handleClient();
 
 private:
     WebServer server;
-    Api& api;
 
     void handleNotFound();
     void handleFile();

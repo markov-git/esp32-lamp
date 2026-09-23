@@ -13,91 +13,62 @@ Api::Api(
 {
 }
 
-bool Api::handleRequest(WebServer& server)
+void Api::registerRoutes(WebServer& server)
 {
-    const String path = server.uri();
+    server.on(
+        "/api/state",
+        HTTP_GET,
+        [this, &server]()
+        {
+            handleState(server);
+        }
+    );
+    server.on(
+        "/api/system",
+        HTTP_GET,
+        [&]() {
+            handleSystem(server);
+        }
+    );
+    server.on(
+        "/api/sensors",
+        HTTP_GET,
+        [&]() {
+            handleSensors(server);
+        }
+    );
+    server.on(
+        "/api/time",
+        HTTP_GET,
+        [&]() {
+            handleTime(server);
+        }
+    );
+    server.on(
+        "/api/time",
+        HTTP_POST,
+        [&]() {
+            handleSetTime(server);
+        }
+    );
 
-    if (!path.startsWith("/api/"))
-    {
-        return false;
-    }
+    server.on(
+        "/api/lighting/manual",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleSetManualBrightness(server);
+        }
+    );
 
-    if (
-        path == "/api/state" &&
-        server.method() == HTTP_GET
-    )
-    {
-        handleState(server);
-        return true;
-    }
-
-    if (
-        path == "/api/system" &&
-        server.method() == HTTP_GET
-    )
-    {
-        handleSystem(server);
-        return true;
-    }
-
-    if (
-        path == "/api/sensors" &&
-        server.method() == HTTP_GET
-    )
-    {
-        handleSensors(server);
-        return true;
-    }
-
-    if (
-        path == "/api/time" &&
-        server.method() == HTTP_GET
-    )
-    {
-        handleTime(server);
-        return true;
-    }
-
-    if (
-        path == "/api/time" &&
-        server.method() == HTTP_POST
-    )
-    {
-        handleSetTime(server);
-        return true;
-    }
-
-    Lamp lamp;
-    Channel channel;
-
-    if (
-        server.method() == HTTP_POST &&
-        parseLampChannel(path, lamp, channel)
-    )
-    {
-        handleSetBrightness(
-            server,
-            lamp,
-            channel
-        );
-
-        return true;
-    }
-
-    if (
-        server.method() == HTTP_POST &&
-        parseLampSchedule(path, lamp)
-    )
-    {
-        handleSetScheduleEnabled(
-            server,
-            lamp
-        );
-
-        return true;
-    }
-
-    return false;
+    server.on(
+        "/api/lighting/schedule",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleSetScheduleEnabled(server);
+        }
+    );
 }
 
 void Api::handleState(WebServer& server)
@@ -167,63 +138,31 @@ void Api::handleSensors(WebServer& server)
     sendSensors(server);
 }
 
-void Api::handleSetBrightness(
-    WebServer& server,
-    Lamp lamp,
-    Channel channel
-)
-{
-    if (!server.hasArg("value"))
-    {
-        server.send(
-            400,
-            "application/json",
-            R"({"error":"missing value"})"
-        );
-
-        return;
-    }
-
-    const int value =
-        server.arg("value").toInt();
-
-    if (value < 0 || value > 100)
-    {
-        server.send(
-            400,
-            "application/json",
-            R"({"error":"value must be between 0 and 100"})"
-        );
-
-        return;
-    }
-
-    bool setResult = lightingController.setManualBrightness(
-        lamp,
-        channel,
-        static_cast<uint8_t>(value)
-    );
-    if (!setResult)
-    {
-        server.send(
-            409,
-            "application/json",
-            "{\"error\":\"schedule_enabled\"}"
-        );
-
-        return;
-    }
-    
-
-    sendState(server);
-}
-
 void Api::handleSetScheduleEnabled(
-    WebServer& server,
-    Lamp lamp
+    WebServer& server
 )
 {
-    if (!server.hasArg("enabled"))
+    JsonDocument doc;
+
+    if (!parseJsonBody(server, doc))
+    {
+        return;
+    }
+
+    Lamp lamp;
+
+    if (!parseLamp(doc["lamp"], lamp))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_lamp"
+        );
+
+        return;
+    }
+
+    if (!doc["enabled"].is<bool>())
     {
         sendJsonError(
             server,
@@ -234,32 +173,8 @@ void Api::handleSetScheduleEnabled(
         return;
     }
 
-    const String value =
-        server.arg("enabled");
-
-    bool enabled;
-
-    if (value == "true" || value == "1")
-    {
-        enabled = true;
-    }
-    else if (
-        value == "false" ||
-        value == "0"
-    )
-    {
-        enabled = false;
-    }
-    else
-    {
-        sendJsonError(
-            server,
-            400,
-            "invalid_enabled"
-        );
-
-        return;
-    }
+    const bool enabled =
+        doc["enabled"].as<bool>();
 
     lightingController.setScheduleEnabled(
         lamp,
@@ -270,134 +185,63 @@ void Api::handleSetScheduleEnabled(
 }
 
 bool Api::parseLamp(
-    const String& value,
+    JsonVariantConst value,
     Lamp& lamp
 ) const
 {
-    if (value == "1")
+    if (!value.is<uint8_t>())
     {
-        lamp = Lamp::Lamp1;
-        return true;
+        return false;
     }
 
-    if (value == "2")
-    {
-        lamp = Lamp::Lamp2;
-        return true;
-    }
+    const uint8_t number =
+        value.as<uint8_t>();
 
-    if (value == "3")
+    switch (number)
     {
-        lamp = Lamp::Lamp3;
-        return true;
-    }
+        case 1:
+            lamp = Lamp::Lamp1;
+            return true;
 
-    return false;
+        case 2:
+            lamp = Lamp::Lamp2;
+            return true;
+
+        case 3:
+            lamp = Lamp::Lamp3;
+            return true;
+
+        default:
+            return false;
+    }
 }
 
 bool Api::parseChannel(
-    const String& value,
+    JsonVariantConst value,
     Channel& channel
 ) const
 {
-    if (value == "red")
+    if (!value.is<const char*>())
+    {
+        return false;
+    }
+
+    const char* valueString =
+        value.as<const char*>();
+
+    if (strcmp(valueString, "red") == 0)
     {
         channel = Channel::Red;
         return true;
     }
 
-    if (value == "blue")
+    if (strcmp(valueString, "blue") == 0)
     {
         channel = Channel::Blue;
         return true;
     }
 
     return false;
-}
-
-bool Api::parseLampChannel(
-    const String& path,
-    Lamp& lamp,
-    Channel& channel
-) const
-{
-    if (!path.startsWith("/api/lamp/"))
-    {
-        return false;
-    }
-
-    const String prefix = "/api/lamp/";
-
-    String remainder =
-        path.substring(prefix.length());
-
-    const int slashIndex =
-        remainder.indexOf('/');
-
-    if (slashIndex <= 0)
-    {
-        return false;
-    }
-
-    const String lampPart =
-        remainder.substring(
-            0,
-            slashIndex
-        );
-
-    const String channelPart =
-        remainder.substring(
-            slashIndex + 1
-        );
-
-    if (!parseLamp(
-            lampPart,
-            lamp))
-    {
-        return false;
-    }
-
-    return parseChannel(
-        channelPart,
-        channel
-    );
-}
-
-bool Api::parseLampSchedule(
-    const String& path,
-    Lamp& lamp
-) const
-{
-    const String prefix =
-        "/api/lamp/";
-
-    if (!path.startsWith(prefix))
-    {
-        return false;
-    }
-
-    String remainder =
-        path.substring(prefix.length());
-
-    const String suffix =
-        "/schedule";
-
-    if (!remainder.endsWith(suffix))
-    {
-        return false;
-    }
-
-    remainder =
-        remainder.substring(
-            0,
-            remainder.length() -
-                suffix.length()
-        );
-
-    return parseLamp(
-        remainder,
-        lamp
-    );
 }
 
 void Api::sendSystem(WebServer& server)
@@ -499,49 +343,110 @@ void Api::sendTime(WebServer& server)
 
 void Api::handleSetTime(WebServer& server)
 {
-    if (!server.hasArg("plain"))
-    {
-        server.send(
-            400,
-            "application/json",
-            "{\"error\":\"Request body is required\"}"
-        );
-
-        return;
-    }
-
     JsonDocument doc;
 
-    const DeserializationError error =
-        deserializeJson(doc, server.arg("plain"));
-
-    if (error)
+    if (!parseJsonBody(server, doc))
     {
-        server.send(
+        return;
+    }
+
+    if (!doc["unix"].is<uint32_t>())
+    {
+        sendJsonError(
+            server,
             400,
-            "application/json",
-            "{\"error\":\"Invalid JSON\"}"
+            "missing_unix"
         );
 
         return;
     }
 
-    if (!doc["unix"].is<uint64_t>())
-    {
-        server.send(
-            400,
-            "application/json",
-            "{\"error\":\"unix is required\"}"
-        );
+    const uint32_t unixTime =
+        doc["unix"].as<uint32_t>();
 
-        return;
-    }
-
-    const uint64_t timestamp = doc["unix"];
-
-    rtc.setDateTime(DateTime(timestamp));
+    rtc.setDateTime(
+        DateTime(unixTime)
+    );
 
     sendTime(server);
+}
+
+void Api::handleSetManualBrightness(
+    WebServer& server
+)
+{
+    JsonDocument doc;
+
+    if (!parseJsonBody(server, doc))
+    {
+        return;
+    }
+
+    Lamp lamp;
+    Channel channel;
+
+    if (!parseLamp(doc["lamp"], lamp))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_lamp"
+        );
+
+        return;
+    }
+
+    if (!parseChannel(doc["channel"], channel))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_channel"
+        );
+
+        return;
+    }
+
+    if (!doc["brightness"].is<uint8_t>())
+    {
+        sendJsonError(
+            server,
+            400,
+            "missing_brightness"
+        );
+
+        return;
+    }
+
+    const uint8_t brightness =
+        doc["brightness"].as<uint8_t>();
+
+    if (brightness > 100)
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_brightness"
+        );
+
+        return;
+    }
+
+    if (!lightingController.setManualBrightness(
+            lamp,
+            channel,
+            brightness))
+    {
+        sendJsonError(
+            server,
+            409,
+            "schedule_enabled"
+        );
+
+        return;
+    }
+
+    sendState(server);
 }
 
 void Api::sendJsonError(
@@ -563,4 +468,40 @@ void Api::sendJsonError(
         "application/json",
         response
     );
+}
+
+bool Api::parseJsonBody(
+    WebServer& server,
+    JsonDocument& doc
+)
+{
+    if (!server.hasArg("plain"))
+    {
+        sendJsonError(
+            server,
+            400,
+            "missing_body"
+        );
+
+        return false;
+    }
+
+    const DeserializationError error =
+        deserializeJson(
+            doc,
+            server.arg("plain")
+        );
+
+    if (error)
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_json"
+        );
+
+        return false;
+    }
+
+    return true;
 }

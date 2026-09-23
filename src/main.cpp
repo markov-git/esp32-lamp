@@ -33,7 +33,7 @@ Api api(
     sensors,
     rtc
 );
-WebServerManager webServer(api);
+WebServerManager webServer;
 
 void setup() {
     Serial.begin(115200);
@@ -42,7 +42,10 @@ void setup() {
     setupWiFi();
 
     lighting.begin();
+    api.registerRoutes(server);
     webServer.begin();
+    server.begin();
+
     sensors.begin();
     rtc.begin();
     lightingController.begin();

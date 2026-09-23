@@ -19,7 +19,7 @@ public:
         Rtc& rtc
     );
 
-    bool handleRequest(WebServer& server);
+    void registerRoutes(WebServer& server);
 
 private:
     LightingController& lightingController;
@@ -34,41 +34,27 @@ private:
     
     void handleSetTime(WebServer& server);
 
+    void handleSetManualBrightness(WebServer& server);
+    void handleSetScheduleEnabled(WebServer& server);
+
     void sendState(WebServer& server);
     void sendSystem(WebServer& server);
     void sendSensors(WebServer& server);
     void sendTime(WebServer& server);
 
-    void handleSetBrightness(
+    bool parseJsonBody(
         WebServer& server,
-        Lamp lamp,
-        Channel channel
-    );
-
-    void handleSetScheduleEnabled(
-        WebServer& server,
-        Lamp lamp
+        JsonDocument& doc
     );
 
     bool parseLamp(
-        const String& value,
+        JsonVariantConst value,
         Lamp& lamp
     ) const;
 
     bool parseChannel(
-        const String& value,
+        JsonVariantConst value,
         Channel& channel
-    ) const;
-
-    bool parseLampChannel(
-        const String& path,
-        Lamp& lamp,
-        Channel& channel
-    ) const;
-
-    bool parseLampSchedule(
-        const String& path,
-        Lamp& lamp
     ) const;
 
     void sendJsonError(
