@@ -114,6 +114,29 @@ ScheduleError LightingController::addScheduleEntry(
     return ScheduleError::None;
 }
 
+ScheduleError LightingController::updateScheduleEntry(
+    Lamp lamp,
+    Channel channel,
+    uint8_t index,
+    const ScheduleEntry& entry
+)
+{
+    const ScheduleError error =
+        schedule.updateEntry(
+            lamp,
+            channel,
+            index,
+            entry
+        );
+
+    if (error != ScheduleError::None)
+        return error;
+
+    update(true);
+
+    return ScheduleError::None;
+}
+
 bool LightingController::deleteScheduleEntry(
     Lamp lamp,
     Channel channel,

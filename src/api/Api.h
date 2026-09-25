@@ -40,6 +40,7 @@ private:
 
     void handleSchedules(WebServer& server);
     void handleAddSchedule(WebServer& server);
+    void handleUpdateSchedule(WebServer& server);
     void handleDeleteSchedule(WebServer& server);
 
     void sendState(WebServer& server);

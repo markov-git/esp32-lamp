@@ -88,6 +88,75 @@ ScheduleError Schedule::addEntry(
 
     return ScheduleError::None;
 }
+ScheduleError Schedule::updateEntry(
+    Lamp lamp,
+    Channel channel,
+    uint8_t index,
+    const ScheduleEntry& entry
+)
+{
+    const uint8_t lampIndex = getLampIndex(lamp);
+
+    ScheduleEntry* entries = nullptr;
+    uint8_t* count = nullptr;
+
+    if (channel == Channel::Red)
+    {
+        entries = schedules[lampIndex].red;
+        count = &schedules[lampIndex].redCount;
+    }
+    else
+    {
+        entries = schedules[lampIndex].blue;
+        count = &schedules[lampIndex].blueCount;
+    }
+
+    if (index >= *count)
+        return ScheduleError::EntryNotFound;
+
+    if (entry.days == 0 || entry.days > 127)
+        return ScheduleError::InvalidDays;
+
+    if (
+        entry.startMinute >= entry.endMinute ||
+        entry.endMinute > 1440
+    )
+    {
+        return ScheduleError::InvalidTime;
+    }
+
+    if (entry.brightness > 100)
+        return ScheduleError::InvalidBrightness;
+
+    const uint16_t duration =
+        entry.endMinute - entry.startMinute;
+
+    if (
+        entry.fadeInMinutes > duration ||
+        entry.fadeOutMinutes > duration
+    )
+    {
+        return ScheduleError::InvalidFade;
+    }
+
+    for (uint8_t i = 0; i < *count; i++)
+    {
+        if (i == index)
+            continue;
+
+        if (
+            (entry.days & entries[i].days) != 0 &&
+            hasOverlap(entry, entries[i])
+        )
+        {
+            return ScheduleError::Overlap;
+        }
+    }
+
+    entries[index] = entry;
+
+    return ScheduleError::None;
+}
 bool Schedule::removeEntry(
     Lamp lamp,
     Channel channel,

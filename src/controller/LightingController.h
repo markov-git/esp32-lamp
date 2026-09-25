@@ -29,6 +29,13 @@ public:
         const ScheduleEntry& entry
     );
 
+    ScheduleError updateScheduleEntry(
+        Lamp lamp,
+        Channel channel,
+        uint8_t index,
+        const ScheduleEntry& entry
+    );
+
     bool deleteScheduleEntry(
         Lamp lamp,
         Channel channel,

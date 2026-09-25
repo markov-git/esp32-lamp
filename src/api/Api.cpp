@@ -89,6 +89,15 @@ void Api::registerRoutes(WebServer& server)
     );
 
     server.on(
+        "/api/schedules/update",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleUpdateSchedule(server);
+        }
+    );
+
+    server.on(
         "/api/schedules/delete",
         HTTP_POST,
         [this, &server]()
@@ -673,6 +682,152 @@ void Api::handleAddSchedule(WebServer& server)
     }
 
     handleSchedules(server);
+}
+
+void Api::handleUpdateSchedule(WebServer& server)
+{
+    JsonDocument doc;
+
+    if (!parseJsonBody(server, doc))
+        return;
+
+    Lamp lamp;
+
+    if (!parseLamp(doc["lamp"], lamp))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_lamp"
+        );
+
+        return;
+    }
+
+    Channel channel;
+
+    if (!parseChannel(doc["channel"], channel))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_channel"
+        );
+
+        return;
+    }
+
+    if (!doc["index"].is<int>())
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_index"
+        );
+
+        return;
+    }
+
+    const int index =
+        doc["index"].as<int>();
+
+    if (
+        index < 0 ||
+        index >= Schedule::MAX_ENTRIES_PER_CHANNEL
+    )
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_index"
+        );
+
+        return;
+    }
+
+    ScheduleEntry entry;
+
+    if (!parseScheduleEntry(doc["entry"], entry))
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_entry"
+        );
+
+        return;
+    }
+
+    const ScheduleError error =
+        lightingController.updateScheduleEntry(
+            lamp,
+            channel,
+            static_cast<uint8_t>(index),
+            entry
+        );
+
+    switch (error)
+    {
+        case ScheduleError::None:
+            handleSchedules(server);
+            return;
+
+        case ScheduleError::EntryNotFound:
+            sendJsonError(
+                server,
+                404,
+                "entry_not_found"
+            );
+            return;
+
+        case ScheduleError::InvalidDays:
+            sendJsonError(
+                server,
+                400,
+                "invalid_days"
+            );
+            return;
+
+        case ScheduleError::InvalidTime:
+            sendJsonError(
+                server,
+                400,
+                "invalid_time"
+            );
+            return;
+
+        case ScheduleError::InvalidBrightness:
+            sendJsonError(
+                server,
+                400,
+                "invalid_brightness"
+            );
+            return;
+
+        case ScheduleError::InvalidFade:
+            sendJsonError(
+                server,
+                400,
+                "invalid_fade"
+            );
+            return;
+
+        case ScheduleError::Overlap:
+            sendJsonError(
+                server,
+                409,
+                "overlap"
+            );
+            return;
+
+        case ScheduleError::MaxEntries:
+            sendJsonError(
+                server,
+                409,
+                "max_entries"
+            );
+            return;
+    }
 }
 
 void Api::handleDeleteSchedule(WebServer& server)

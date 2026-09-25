@@ -37,6 +37,7 @@ struct ScheduleState
 enum class ScheduleError
 {
     None,
+    EntryNotFound,
     InvalidDays,
     InvalidTime,
     InvalidBrightness,
@@ -57,6 +58,13 @@ public:
     ScheduleError addEntry(
         Lamp lamp,
         Channel channel,
+        const ScheduleEntry& entry
+    );
+
+    ScheduleError updateEntry(
+        Lamp lamp,
+        Channel channel,
+        uint8_t index,
         const ScheduleEntry& entry
     );
 
