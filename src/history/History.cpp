@@ -1,7 +1,11 @@
 #include "History.h"
 
-History::History(SdCard& sdCard)
-    : sdCard(sdCard)
+History::History(
+    SdCard& sdCard,
+    Sensors& sensors
+)
+    : sdCard(sdCard),
+      sensors(sensors)
 {
 }
 
@@ -23,30 +27,23 @@ bool History::begin()
 }
 
 void History::update(
-    const DateTime& timestamp,
-    const SensorsState& state
+    const DateTime& timestamp
 )
 {
     const int64_t currentTimestamp =
         static_cast<int64_t>(timestamp.unixtime());
 
-    if (lastRecordTimestamp < 0)
-    {
-        if (record(timestamp, state))
-        {
-            lastRecordTimestamp = currentTimestamp;
-        }
-
-        return;
-    }
-
     if (
+        lastRecordTimestamp >= 0 &&
         currentTimestamp - lastRecordTimestamp <
-        RECORD_INTERVAL_SECONDS
+            RECORD_INTERVAL_SECONDS
     )
     {
         return;
     }
+
+    const SensorsState state =
+        sensors.getState();
 
     if (record(timestamp, state))
     {

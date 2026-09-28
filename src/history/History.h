@@ -9,16 +9,15 @@
 class History
 {
 public:
-    explicit History(SdCard& sdCard);
+    History(
+        SdCard& sdCard,
+        Sensors& sensors
+    );
 
     bool begin();
 
-    void update(const DateTime& timestamp, const SensorsState& state);
+    void update(const DateTime& timestamp);
 
-    bool record(
-        const DateTime& timestamp,
-        const SensorsState& state
-    );
 
 private:
     static constexpr uint32_t RECORD_INTERVAL_SECONDS = 10 * 60;
@@ -30,8 +29,14 @@ private:
         "soil3_raw,soil3_percent,crc\n";
 
     SdCard& sdCard;
+    Sensors& sensors;
 
     int64_t lastRecordTimestamp = -1;
+
+    bool record(
+        const DateTime& timestamp,
+        const SensorsState& state
+    );
 
     bool ensureDirectory();
     bool ensureFileHeader(const String& path);

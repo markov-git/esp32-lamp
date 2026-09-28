@@ -23,7 +23,10 @@ SystemInfo systemInfo;
 Sensors sensors;
 Rtc rtc;
 SdCard sdCard;
-History history(sdCard);
+History history(
+    sdCard,
+    sensors
+);
 
 LightingController lightingController(
     lighting,
@@ -72,8 +75,5 @@ void loop()
 
     const SensorsState sensorState = sensors.getState();
 
-    history.update(
-        now,
-        sensorState
-    );
+    history.update(now);
 }
