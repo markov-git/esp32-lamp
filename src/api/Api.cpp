@@ -502,7 +502,7 @@ void Api::handleSchedules(WebServer& server)
         JsonObject lampObject =
             lamps.add<JsonObject>();
 
-        lampObject["id"] = i + 1;
+        lampObject["lampId"] = i + 1;
 
         lampObject["enabled"] =
             schedule.enabled;
