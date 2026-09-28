@@ -12,6 +12,7 @@
 #include "sensors/Sensors.h"
 #include "time/Rtc.h"
 #include "controller/LightingController.h"
+#include "storage/SdCard.h"
 
 WebServer server(80);
 
@@ -20,6 +21,7 @@ Schedule schedule;
 SystemInfo systemInfo;
 Sensors sensors;
 Rtc rtc;
+SdCard sdCard;
 
 LightingController lightingController(
     lighting,
@@ -49,6 +51,7 @@ void setup() {
     sensors.begin();
     rtc.begin();
     schedule.load();
+    sdCard.begin();
     lightingController.begin();
 
     Serial.println("App started");
