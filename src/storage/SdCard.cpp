@@ -2,9 +2,6 @@
 
 bool SdCard::begin()
 {
-    Serial.println();
-    Serial.println("=== microSD initialization ===");
-
     SPI.begin(
         SCK_PIN,
         MISO_PIN,
