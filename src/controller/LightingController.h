@@ -55,6 +55,8 @@ public:
         int16_t offsetMinutes
     );
 
+    int16_t getTimezoneOffsetMinutes() const;
+
     LightingState getEffectiveState() const;
 
     LightingState getManualState() const;

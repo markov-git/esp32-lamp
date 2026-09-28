@@ -30,9 +30,12 @@ private:
     void handleState(WebServer& server);
     void handleSystem(WebServer& server);
     void handleSensors(WebServer& server);
+
     void handleTime(WebServer& server);
-    
     void handleSetTime(WebServer& server);
+
+    void handleTimezone(WebServer& server);
+    void handleSetTimezone(WebServer& server);
 
     void handleSetManualBrightness(WebServer& server);
 

@@ -221,6 +221,11 @@ bool LightingController::setTimezoneOffsetMinutes(
     return true;
 }
 
+int16_t LightingController::getTimezoneOffsetMinutes() const
+{
+    return schedule.getTimezoneOffsetMinutes();
+}
+
 LightingState LightingController::getEffectiveState() const
 {
     return effectiveState;

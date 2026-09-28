@@ -53,6 +53,24 @@ void Api::registerRoutes(WebServer& server)
     );
 
     server.on(
+        "/api/timezone",
+        HTTP_GET,
+        [this, &server]()
+        {
+            handleTimezone(server);
+        }
+    );
+
+    server.on(
+        "/api/timezone",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleSetTimezone(server);
+        }
+    );
+
+    server.on(
         "/api/lighting/manual",
         HTTP_POST,
         [this, &server]()
@@ -405,6 +423,93 @@ void Api::handleSetTime(WebServer& server)
     );
 
     sendTime(server);
+}
+
+void Api::handleTimezone(WebServer& server)
+{
+    JsonDocument doc;
+
+    doc["offsetMinutes"] =
+        lightingController.getTimezoneOffsetMinutes();
+
+    String response;
+
+    serializeJson(
+        doc,
+        response
+    );
+
+    server.send(
+        200,
+        "application/json",
+        response
+    );
+}
+
+void Api::handleSetTimezone(WebServer& server)
+{
+    JsonDocument doc;
+
+    if (!parseJsonBody(server, doc))
+        return;
+
+    if (!doc["offsetMinutes"].is<int>())
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_offset"
+        );
+
+        return;
+    }
+
+    const int offsetMinutes =
+        doc["offsetMinutes"].as<int>();
+
+    if (
+        offsetMinutes < -720 ||
+        offsetMinutes > 840
+    )
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_offset"
+        );
+
+        return;
+    }
+
+    if (
+        offsetMinutes % 15 != 0
+    )
+    {
+        sendJsonError(
+            server,
+            400,
+            "invalid_offset"
+        );
+
+        return;
+    }
+
+    if (
+        !lightingController.setTimezoneOffsetMinutes(
+            static_cast<int16_t>(offsetMinutes)
+        )
+    )
+    {
+        sendJsonError(
+            server,
+            500,
+            "save_failed"
+        );
+
+        return;
+    }
+
+    handleTimezone(server);
 }
 
 void Api::handleSetManualBrightness(
