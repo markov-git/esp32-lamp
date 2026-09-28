@@ -51,6 +51,10 @@ public:
         Lamp lamp
     ) const;
 
+    bool setTimezoneOffsetMinutes(
+        int16_t offsetMinutes
+    );
+
     LightingState getEffectiveState() const;
 
     LightingState getManualState() const;

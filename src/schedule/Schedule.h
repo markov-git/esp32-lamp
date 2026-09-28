@@ -53,6 +53,9 @@ public:
 
     Schedule();
 
+    bool load();
+    bool save() const;
+
     void clear();
 
     ScheduleError addEntry(

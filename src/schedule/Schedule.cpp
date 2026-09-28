@@ -1,14 +1,395 @@
 #include "Schedule.h"
 
+#include <ArduinoJson.h>
+#include <LittleFS.h>
+
 namespace
 {
     constexpr uint8_t DAYS_MASK = 0b01111111;
     constexpr uint16_t MINUTES_PER_DAY = 24 * 60;
+
+    constexpr char SCHEDULE_FILE[] =
+        "/config/schedule.json";
+
+    constexpr char TEMP_FILE[] =
+        "/config/schedule.tmp";
+
+    bool loadChannel(
+        JsonVariantConst value,
+        ScheduleEntry* entries,
+        uint8_t& count
+    )
+    {
+        if (!value.is<JsonArrayConst>())
+            return false;
+
+        JsonArrayConst array =
+            value.as<JsonArrayConst>();
+
+        if (
+            array.size() >
+            Schedule::MAX_ENTRIES_PER_CHANNEL
+        )
+        {
+            return false;
+        }
+
+        count = 0;
+
+        for (JsonObjectConst object : array)
+        {
+            if (
+                !object["days"].is<int>() ||
+                !object["start"].is<int>() ||
+                !object["end"].is<int>() ||
+                !object["brightness"].is<int>() ||
+                !object["fadeIn"].is<int>() ||
+                !object["fadeOut"].is<int>()
+            )
+            {
+                return false;
+            }
+
+            const int days =
+                object["days"].as<int>();
+
+            const int start =
+                object["start"].as<int>();
+
+            const int end =
+                object["end"].as<int>();
+
+            const int brightness =
+                object["brightness"].as<int>();
+
+            const int fadeIn =
+                object["fadeIn"].as<int>();
+
+            const int fadeOut =
+                object["fadeOut"].as<int>();
+
+            if (
+                days < 0 || days > 127 ||
+                start < 0 || start > 1440 ||
+                end < 0 || end > 1440 ||
+                brightness < 0 || brightness > 100 ||
+                fadeIn < 0 || fadeIn > 1440 ||
+                fadeOut < 0 || fadeOut > 1440
+            )
+            {
+                return false;
+            }
+
+            ScheduleEntry& entry =
+                entries[count];
+
+            entry.days =
+                static_cast<uint8_t>(days);
+
+            entry.startMinute =
+                static_cast<uint16_t>(start);
+
+            entry.endMinute =
+                static_cast<uint16_t>(end);
+
+            entry.brightness =
+                static_cast<uint8_t>(brightness);
+
+            entry.fadeInMinutes =
+                static_cast<uint16_t>(fadeIn);
+
+            entry.fadeOutMinutes =
+                static_cast<uint16_t>(fadeOut);
+
+            count++;
+        }
+
+        return true;
+    }
 }
 
 Schedule::Schedule()
 {
     clear();
+}
+
+bool Schedule::save() const
+{
+    if (!LittleFS.exists("/config"))
+    {
+        if (!LittleFS.mkdir("/config"))
+        {
+            Serial.println(
+                "Failed to create config directory"
+            );
+
+            return false;
+        }
+    }
+
+    JsonDocument doc;
+
+    doc["timezoneOffsetMinutes"] =
+        timezoneOffsetMinutes;
+
+    JsonArray lamps =
+        doc["lamps"].to<JsonArray>();
+
+    for (uint8_t i = 0;
+         i < Lighting::LAMP_COUNT;
+         i++)
+    {
+        const LampSchedule& schedule =
+            schedules[i];
+
+        JsonObject lamp =
+            lamps.add<JsonObject>();
+
+        lamp["enabled"] =
+            schedule.enabled;
+
+        JsonArray red =
+            lamp["red"].to<JsonArray>();
+
+        for (uint8_t j = 0;
+             j < schedule.redCount;
+             j++)
+        {
+            const ScheduleEntry& source =
+                schedule.red[j];
+
+            JsonObject entry =
+                red.add<JsonObject>();
+
+            entry["days"] =
+                source.days;
+
+            entry["start"] =
+                source.startMinute;
+
+            entry["end"] =
+                source.endMinute;
+
+            entry["brightness"] =
+                source.brightness;
+
+            entry["fadeIn"] =
+                source.fadeInMinutes;
+
+            entry["fadeOut"] =
+                source.fadeOutMinutes;
+        }
+
+        JsonArray blue =
+            lamp["blue"].to<JsonArray>();
+
+        for (uint8_t j = 0;
+             j < schedule.blueCount;
+             j++)
+        {
+            const ScheduleEntry& source =
+                schedule.blue[j];
+
+            JsonObject entry =
+                blue.add<JsonObject>();
+
+            entry["days"] =
+                source.days;
+
+            entry["start"] =
+                source.startMinute;
+
+            entry["end"] =
+                source.endMinute;
+
+            entry["brightness"] =
+                source.brightness;
+
+            entry["fadeIn"] =
+                source.fadeInMinutes;
+
+            entry["fadeOut"] =
+                source.fadeOutMinutes;
+        }
+    }
+
+    File file =
+        LittleFS.open(TEMP_FILE, "w");
+
+    if (!file)
+    {
+        Serial.println(
+            "Failed to open schedule temp file"
+        );
+
+        return false;
+    }
+
+    const size_t bytesWritten =
+        serializeJson(doc, file);
+
+    file.close();
+
+    if (bytesWritten == 0)
+    {
+        Serial.println(
+            "Failed to write schedule"
+        );
+
+        LittleFS.remove(TEMP_FILE);
+
+        return false;
+    }
+
+    if (LittleFS.exists(SCHEDULE_FILE))
+    {
+        LittleFS.remove(SCHEDULE_FILE);
+    }
+
+    if (!LittleFS.rename(
+        TEMP_FILE,
+        SCHEDULE_FILE
+    ))
+    {
+        Serial.println(
+            "Failed to replace schedule file"
+        );
+
+        LittleFS.remove(TEMP_FILE);
+
+        return false;
+    }
+
+    return true;
+}
+
+bool Schedule::load()
+{
+    if (!LittleFS.exists(SCHEDULE_FILE))
+    {
+        Serial.println(
+            "Schedule file not found, using defaults"
+        );
+
+        clear();
+
+        return true;
+    }
+
+    File file =
+        LittleFS.open(SCHEDULE_FILE, "r");
+
+    if (!file)
+    {
+        Serial.println(
+            "Failed to open schedule file"
+        );
+
+        clear();
+
+        return false;
+    }
+
+    JsonDocument doc;
+
+    const DeserializationError error =
+        deserializeJson(doc, file);
+
+    file.close();
+
+    if (error)
+    {
+        Serial.print(
+            "Failed to parse schedule: "
+        );
+
+        Serial.println(
+            error.c_str()
+        );
+
+        clear();
+
+        return false;
+    }
+
+    clear();
+
+    if (
+        doc["timezoneOffsetMinutes"]
+            .is<int>()
+    )
+    {
+        timezoneOffsetMinutes =
+            doc["timezoneOffsetMinutes"]
+                .as<int16_t>();
+    }
+
+    JsonArrayConst lamps =
+        doc["lamps"].as<JsonArrayConst>();
+
+    if (lamps.isNull())
+    {
+        Serial.println(
+            "Invalid schedule: lamps missing"
+        );
+
+        clear();
+
+        return false;
+    }
+
+    if (lamps.size() != Lighting::LAMP_COUNT)
+    {
+        Serial.println(
+            "Invalid schedule: wrong lamp count"
+        );
+
+        clear();
+
+        return false;
+    }
+
+    for (uint8_t i = 0;
+         i < Lighting::LAMP_COUNT;
+         i++)
+    {
+        JsonObjectConst lamp =
+            lamps[i].as<JsonObjectConst>();
+
+        if (lamp.isNull())
+        {
+            clear();
+
+            return false;
+        }
+
+        schedules[i].enabled =
+            lamp["enabled"] | false;
+
+        if (!loadChannel(
+                lamp["red"],
+                schedules[i].red,
+                schedules[i].redCount
+            ))
+        {
+            clear();
+
+            return false;
+        }
+
+        if (!loadChannel(
+                lamp["blue"],
+                schedules[i].blue,
+                schedules[i].blueCount
+            ))
+        {
+            clear();
+
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void Schedule::clear()
@@ -20,6 +401,8 @@ void Schedule::clear()
         schedules[i].redCount = 0;
         schedules[i].blueCount = 0;
     }
+
+    timezoneOffsetMinutes = 180;
 }
 
 ScheduleError Schedule::addEntry(

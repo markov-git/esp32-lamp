@@ -48,6 +48,7 @@ void setup() {
 
     sensors.begin();
     rtc.begin();
+    schedule.load();
     lightingController.begin();
 
     Serial.println("App started");

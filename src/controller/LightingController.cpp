@@ -109,6 +109,13 @@ ScheduleError LightingController::addScheduleEntry(
     if (error != ScheduleError::None)
         return error;
 
+    if (!schedule.save())
+    {
+        Serial.println(
+            "Failed to save schedule after add"
+        );
+    }
+
     update(true);
 
     return ScheduleError::None;
@@ -132,6 +139,13 @@ ScheduleError LightingController::updateScheduleEntry(
     if (error != ScheduleError::None)
         return error;
 
+    if (!schedule.save())
+    {
+        Serial.println(
+            "Failed to save schedule after update"
+        );
+    }
+
     update(true);
 
     return ScheduleError::None;
@@ -145,6 +159,13 @@ bool LightingController::deleteScheduleEntry(
 {
     if (!schedule.removeEntry(lamp, channel, index))
         return false;
+
+    if (!schedule.save())
+    {
+        Serial.println(
+            "Failed to save schedule after delete"
+        );
+    }
 
     update(true);
 
@@ -161,6 +182,13 @@ void LightingController::setScheduleEnabled(
         enabled
     );
 
+    if (!schedule.save())
+    {
+        Serial.println(
+            "Failed to save schedule after enable change"
+        );
+    }
+
     update(true);
 }
 
@@ -169,6 +197,28 @@ bool LightingController::isScheduleEnabled(
 ) const
 {
     return schedule.isEnabled(lamp);
+}
+
+bool LightingController::setTimezoneOffsetMinutes(
+    int16_t offsetMinutes
+)
+{
+    schedule.setTimezoneOffsetMinutes(
+        offsetMinutes
+    );
+
+    if (!schedule.save())
+    {
+        Serial.println(
+            "Failed to save timezone"
+        );
+
+        return false;
+    }
+
+    update(true);
+
+    return true;
 }
 
 LightingState LightingController::getEffectiveState() const
