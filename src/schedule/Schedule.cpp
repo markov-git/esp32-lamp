@@ -216,8 +216,14 @@ ScheduleState Schedule::getState(
 {
     ScheduleState state{};
 
+    const DateTime localTime(
+        now.unixtime() +
+        static_cast<int32_t>(timezoneOffsetMinutes) * 60
+    );
+
     const uint16_t currentMinute =
-        now.hour() * 60 + now.minute();
+        localTime.hour() * 60 +
+        localTime.minute();
 
     const uint8_t dayOfWeek =
         now.dayOfTheWeek();
@@ -386,4 +392,16 @@ bool Schedule::hasOverlap(
     return
         first.startMinute < second.endMinute &&
         second.startMinute < first.endMinute;
+}
+
+void Schedule::setTimezoneOffsetMinutes(
+    int16_t offsetMinutes
+)
+{
+    timezoneOffsetMinutes = offsetMinutes;
+}
+
+int16_t Schedule::getTimezoneOffsetMinutes() const
+{
+    return timezoneOffsetMinutes;
 }

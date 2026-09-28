@@ -82,8 +82,14 @@ public:
 
     ScheduleState getState(const DateTime& now) const;
 
+    void setTimezoneOffsetMinutes(int16_t offsetMinutes);
+
+    int16_t getTimezoneOffsetMinutes() const;
+
 private:
     LampSchedule schedules[Lighting::LAMP_COUNT];
+
+    int16_t timezoneOffsetMinutes = 180;
 
     uint8_t getLampIndex(Lamp lamp) const;
 
