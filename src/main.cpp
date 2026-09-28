@@ -13,6 +13,7 @@
 #include "time/Rtc.h"
 #include "controller/LightingController.h"
 #include "storage/SdCard.h"
+#include "history/History.h"
 
 WebServer server(80);
 
@@ -22,6 +23,7 @@ SystemInfo systemInfo;
 Sensors sensors;
 Rtc rtc;
 SdCard sdCard;
+History history(sdCard);
 
 LightingController lightingController(
     lighting,
@@ -52,6 +54,10 @@ void setup() {
     rtc.begin();
     schedule.load();
     sdCard.begin();
+    if (sdCard.isReady())
+    {
+        history.begin();
+    }
     lightingController.begin();
 
     Serial.println("App started");
@@ -59,7 +65,15 @@ void setup() {
 
 void loop()
 {
+    const DateTime now = rtc.getDateTime();
+
+    lightingController.update(now);
     server.handleClient();
 
-    lightingController.update();
+    const SensorsState sensorState = sensors.getState();
+
+    history.update(
+        now,
+        sensorState
+    );
 }

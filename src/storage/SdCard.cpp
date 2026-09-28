@@ -52,6 +52,17 @@ File SdCard::open(
     return SD.open(path, mode);
 }
 
+bool SdCard::mkdir(const char* path)
+{
+    if (!ready)
+        return false;
+
+    if (SD.exists(path))
+        return true;
+
+    return SD.mkdir(path);
+}
+
 bool SdCard::writeFile(
     const char* path,
     const String& content

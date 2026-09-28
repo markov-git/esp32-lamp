@@ -15,7 +15,7 @@ public:
 
     void begin();
 
-    void update();
+    void update(const DateTime& now);
 
     bool setManualBrightness(
         Lamp lamp,
@@ -74,7 +74,12 @@ private:
     // -1 означает "ещё не инициализирован"
     int32_t lastScheduleMinute = -1;
 
-    void update(bool force);
+    void update(
+        const DateTime& now,
+        bool force
+    );
+
+    void updateNow();
 
     void applyState(
         const LightingState& state

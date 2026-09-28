@@ -15,19 +15,28 @@ void LightingController::begin()
 {
     effectiveState = lighting.getState();
 
-    update(true);
+    updateNow();
 }
 
-void LightingController::update()
+void LightingController::update(
+    const DateTime& now
+)
 {
-    update(false);
+    update(now, false);
 }
 
-void LightingController::update(bool force)
+void LightingController::updateNow()
 {
-    const DateTime now =
-        rtc.getDateTime();
+    const DateTime now = rtc.getDateTime();
 
+    update(now, true);
+}
+
+void LightingController::update(
+    const DateTime& now,
+    bool force
+)
+{
     const int32_t currentScheduleMinute =
         static_cast<int32_t>(
             now.unixtime() / 60
@@ -88,7 +97,7 @@ bool LightingController::setManualBrightness(
         return false;
     }
 
-    update(true);
+    updateNow();
 
     return true;
 }
@@ -116,7 +125,7 @@ ScheduleError LightingController::addScheduleEntry(
         );
     }
 
-    update(true);
+    updateNow();
 
     return ScheduleError::None;
 }
@@ -146,7 +155,7 @@ ScheduleError LightingController::updateScheduleEntry(
         );
     }
 
-    update(true);
+    updateNow();
 
     return ScheduleError::None;
 }
@@ -167,7 +176,7 @@ bool LightingController::deleteScheduleEntry(
         );
     }
 
-    update(true);
+    updateNow();
 
     return true;
 }
@@ -189,7 +198,7 @@ void LightingController::setScheduleEnabled(
         );
     }
 
-    update(true);
+    updateNow();
 }
 
 bool LightingController::isScheduleEnabled(
@@ -216,7 +225,7 @@ bool LightingController::setTimezoneOffsetMinutes(
         return false;
     }
 
-    update(true);
+    updateNow();
 
     return true;
 }

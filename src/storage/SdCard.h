@@ -14,6 +14,8 @@ public:
 
     File open(const char* path, const char* mode = FILE_READ);
 
+    bool mkdir(const char* path);
+
     bool writeFile(
         const char* path,
         const String& content
