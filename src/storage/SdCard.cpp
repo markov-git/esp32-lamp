@@ -18,32 +18,12 @@ bool SdCard::begin()
 
     ready = true;
 
-    Serial.println("SD initialized.");
+    Serial.print("SD initialized. ");
 
     Serial.print("Card size: ");
     Serial.print(SD.cardSize() / (1024 * 1024));
     Serial.println(" MB");
 
-    Serial.print("Card type: ");
-
-    switch (SD.cardType())
-    {
-        case CARD_MMC:
-            Serial.println("MMC");
-            break;
-
-        case CARD_SD:
-            Serial.println("SDSC");
-            break;
-
-        case CARD_SDHC:
-            Serial.println("SDHC");
-            break;
-
-        default:
-            Serial.println("UNKNOWN");
-            break;
-    }
 
     return true;
 }
