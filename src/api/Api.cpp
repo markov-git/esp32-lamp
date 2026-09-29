@@ -1,15 +1,64 @@
 #include "Api.h"
 
+namespace
+{
+    struct HistoryResponseContext
+    {
+        WebServer* server;
+        bool firstRecord;
+    };
+
+    void writeHistoryRecord(
+        const HistoryRecord& record,
+        void* context
+    )
+    {
+        auto* ctx =
+            static_cast<HistoryResponseContext*>(context);
+
+        if (!ctx->firstRecord)
+        {
+            ctx->server->sendContent(",");
+        }
+
+        ctx->firstRecord = false;
+
+        JsonDocument doc;
+
+        doc["timestamp"] = record.timestamp;
+        doc["temperature"] = record.temperature;
+        doc["humidity"] = record.humidity;
+        doc["pressure"] = record.pressure;
+
+        JsonArray soil = doc["soil"].to<JsonArray>();
+
+        for (uint8_t i = 0; i < 3; i++)
+        {
+            JsonObject item = soil.add<JsonObject>();
+
+            item["raw"] = record.soilRaw[i];
+            item["percent"] = record.soilPercent[i];
+        }
+
+        String json;
+        serializeJson(doc, json);
+
+        ctx->server->sendContent(json);
+    }
+}
+
 Api::Api(
     LightingController& lightingController,
     SystemInfo& systemInfo,
     Sensors& sensors,
-    Rtc& rtc
+    Rtc& rtc,
+    History& history
 )
     : lightingController(lightingController),
     systemInfo(systemInfo),
     sensors(sensors),
-    rtc(rtc)
+    rtc(rtc),
+    history(history)
 {
 }
 
@@ -121,6 +170,15 @@ void Api::registerRoutes(WebServer& server)
         [this, &server]()
         {
             handleDeleteSchedule(server);
+        }
+    );
+
+    server.on(
+        "/api/history",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleGetHistory(server);
         }
     );
 }
@@ -253,20 +311,20 @@ bool Api::parseLamp(
 
     switch (number)
     {
-        case 1:
-            lamp = Lamp::Lamp1;
-            return true;
+    case 1:
+        lamp = Lamp::Lamp1;
+        return true;
 
-        case 2:
-            lamp = Lamp::Lamp2;
-            return true;
+    case 2:
+        lamp = Lamp::Lamp2;
+        return true;
 
-        case 3:
-            lamp = Lamp::Lamp3;
-            return true;
+    case 3:
+        lamp = Lamp::Lamp3;
+        return true;
 
-        default:
-            return false;
+    default:
+        return false;
     }
 }
 
@@ -470,7 +528,7 @@ void Api::handleSetTimezone(WebServer& server)
     if (
         offsetMinutes < -720 ||
         offsetMinutes > 840
-    )
+        )
     {
         sendJsonError(
             server,
@@ -483,7 +541,7 @@ void Api::handleSetTimezone(WebServer& server)
 
     if (
         offsetMinutes % 15 != 0
-    )
+        )
     {
         sendJsonError(
             server,
@@ -498,7 +556,7 @@ void Api::handleSetTimezone(WebServer& server)
         !lightingController.setTimezoneOffsetMinutes(
             static_cast<int16_t>(offsetMinutes)
         )
-    )
+        )
     {
         sendJsonError(
             server,
@@ -574,9 +632,9 @@ void Api::handleSetManualBrightness(
     }
 
     if (!lightingController.setManualBrightness(
-            lamp,
-            channel,
-            brightness))
+        lamp,
+        channel,
+        brightness))
     {
         sendJsonError(
             server,
@@ -733,56 +791,56 @@ void Api::handleAddSchedule(WebServer& server)
     {
         switch (error)
         {
-            case ScheduleError::InvalidDays:
-                sendJsonError(
-                    server,
-                    400,
-                    "invalid_days"
-                );
-                return;
+        case ScheduleError::InvalidDays:
+            sendJsonError(
+                server,
+                400,
+                "invalid_days"
+            );
+            return;
 
-            case ScheduleError::InvalidTime:
-                sendJsonError(
-                    server,
-                    400,
-                    "invalid_time"
-                );
-                return;
+        case ScheduleError::InvalidTime:
+            sendJsonError(
+                server,
+                400,
+                "invalid_time"
+            );
+            return;
 
-            case ScheduleError::InvalidBrightness:
-                sendJsonError(
-                    server,
-                    400,
-                    "invalid_brightness"
-                );
-                return;
+        case ScheduleError::InvalidBrightness:
+            sendJsonError(
+                server,
+                400,
+                "invalid_brightness"
+            );
+            return;
 
-            case ScheduleError::InvalidFade:
-                sendJsonError(
-                    server,
-                    400,
-                    "invalid_fade"
-                );
-                return;
+        case ScheduleError::InvalidFade:
+            sendJsonError(
+                server,
+                400,
+                "invalid_fade"
+            );
+            return;
 
-            case ScheduleError::MaxEntries:
-                sendJsonError(
-                    server,
-                    409,
-                    "max_entries"
-                );
-                return;
+        case ScheduleError::MaxEntries:
+            sendJsonError(
+                server,
+                409,
+                "max_entries"
+            );
+            return;
 
-            case ScheduleError::Overlap:
-                sendJsonError(
-                    server,
-                    409,
-                    "overlap"
-                );
-                return;
+        case ScheduleError::Overlap:
+            sendJsonError(
+                server,
+                409,
+                "overlap"
+            );
+            return;
 
-            case ScheduleError::None:
-                break;
+        case ScheduleError::None:
+            break;
         }
     }
 
@@ -839,7 +897,7 @@ void Api::handleUpdateSchedule(WebServer& server)
     if (
         index < 0 ||
         index >= Schedule::MAX_ENTRIES_PER_CHANNEL
-    )
+        )
     {
         sendJsonError(
             server,
@@ -873,65 +931,65 @@ void Api::handleUpdateSchedule(WebServer& server)
 
     switch (error)
     {
-        case ScheduleError::None:
-            handleSchedules(server);
-            return;
+    case ScheduleError::None:
+        handleSchedules(server);
+        return;
 
-        case ScheduleError::EntryNotFound:
-            sendJsonError(
-                server,
-                404,
-                "entry_not_found"
-            );
-            return;
+    case ScheduleError::EntryNotFound:
+        sendJsonError(
+            server,
+            404,
+            "entry_not_found"
+        );
+        return;
 
-        case ScheduleError::InvalidDays:
-            sendJsonError(
-                server,
-                400,
-                "invalid_days"
-            );
-            return;
+    case ScheduleError::InvalidDays:
+        sendJsonError(
+            server,
+            400,
+            "invalid_days"
+        );
+        return;
 
-        case ScheduleError::InvalidTime:
-            sendJsonError(
-                server,
-                400,
-                "invalid_time"
-            );
-            return;
+    case ScheduleError::InvalidTime:
+        sendJsonError(
+            server,
+            400,
+            "invalid_time"
+        );
+        return;
 
-        case ScheduleError::InvalidBrightness:
-            sendJsonError(
-                server,
-                400,
-                "invalid_brightness"
-            );
-            return;
+    case ScheduleError::InvalidBrightness:
+        sendJsonError(
+            server,
+            400,
+            "invalid_brightness"
+        );
+        return;
 
-        case ScheduleError::InvalidFade:
-            sendJsonError(
-                server,
-                400,
-                "invalid_fade"
-            );
-            return;
+    case ScheduleError::InvalidFade:
+        sendJsonError(
+            server,
+            400,
+            "invalid_fade"
+        );
+        return;
 
-        case ScheduleError::Overlap:
-            sendJsonError(
-                server,
-                409,
-                "overlap"
-            );
-            return;
+    case ScheduleError::Overlap:
+        sendJsonError(
+            server,
+            409,
+            "overlap"
+        );
+        return;
 
-        case ScheduleError::MaxEntries:
-            sendJsonError(
-                server,
-                409,
-                "max_entries"
-            );
-            return;
+    case ScheduleError::MaxEntries:
+        sendJsonError(
+            server,
+            409,
+            "max_entries"
+        );
+        return;
     }
 }
 
@@ -1011,6 +1069,75 @@ void Api::handleDeleteSchedule(WebServer& server)
     handleSchedules(server);
 }
 
+void Api::handleGetHistory(WebServer& server)
+{
+    JsonDocument request;
+
+    if (!parseJsonBody(server, request))
+        return;
+
+    if (!request["range"].is<const char*>())
+    {
+        sendJsonError(server, 400, "missing_range");
+        return;
+    }
+
+    const String range =
+        request["range"].as<String>();
+
+    HistoryRange historyRange;
+
+    if (range == "day")
+    {
+        historyRange = HistoryRange::Day;
+    }
+    else if (range == "month")
+    {
+        historyRange = HistoryRange::Month;
+    }
+    else if (range == "all")
+    {
+        historyRange = HistoryRange::All;
+    }
+    else
+    {
+        sendJsonError(server, 400, "invalid_range");
+        return;
+    }
+
+    const DateTime now =
+        rtc.getDateTime();
+
+    HistoryResponseContext context{
+        &server,
+        true
+    };
+
+    server.setContentLength(
+        CONTENT_LENGTH_UNKNOWN
+    );
+
+    String header =
+        "{\"range\":\"" +
+        range +
+        "\",\"records\":[";
+
+    server.send(
+        200,
+        "application/json",
+        header
+    );
+
+    history.forEachRecord(
+        historyRange,
+        now,
+        writeHistoryRecord,
+        &context
+    );
+
+    server.sendContent("]}");
+}
+
 void Api::sendJsonError(
     WebServer& server,
     int statusCode,
@@ -1086,7 +1213,7 @@ bool Api::parseScheduleEntry(
         !object["brightness"].is<int>() ||
         !object["fadeIn"].is<int>() ||
         !object["fadeOut"].is<int>()
-    )
+        )
     {
         return false;
     }
@@ -1116,7 +1243,7 @@ bool Api::parseScheduleEntry(
         brightness < 0 || brightness > 100 ||
         fadeIn < 0 || fadeIn > 1440 ||
         fadeOut < 0 || fadeOut > 1440
-    )
+        )
     {
         return false;
     }

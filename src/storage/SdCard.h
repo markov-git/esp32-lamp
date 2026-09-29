@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <Arduino.h>
 #include <SPI.h>
 #include <SD.h>
@@ -13,6 +14,12 @@ public:
     bool exists(const char* path) const;
 
     File open(const char* path, const char* mode = FILE_READ);
+
+    bool forEachFile(
+        const char* directory,
+        bool (*callback)(const char* path, void* context),
+        void* context
+    );
 
     bool mkdir(const char* path);
 
@@ -33,11 +40,18 @@ public:
 
     bool removeFile(const char* path);
 
+    bool listFiles(
+        const char* directory,
+        std::vector<String>& paths
+    ) const;
+
 private:
     static constexpr uint8_t CS_PIN = 5;
     static constexpr uint8_t SCK_PIN = 18;
     static constexpr uint8_t MISO_PIN = 19;
     static constexpr uint8_t MOSI_PIN = 23;
+
+    static constexpr uint8_t MAX_FILES = 64;
 
     bool ready = false;
 };

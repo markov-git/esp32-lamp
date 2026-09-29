@@ -38,7 +38,8 @@ Api api(
     lightingController,
     systemInfo,
     sensors,
-    rtc
+    rtc,
+    history
 );
 WebServerManager webServer(server);
 

@@ -52,6 +52,49 @@ File SdCard::open(
     return SD.open(path, mode);
 }
 
+bool SdCard::forEachFile(
+    const char* directory,
+    bool (*callback)(const char* path, void* context),
+    void* context
+)
+{
+    if (!ready)
+        return false;
+
+    if (callback == nullptr)
+        return false;
+
+    File root = SD.open(directory);
+
+    if (!root || !root.isDirectory())
+        return false;
+
+    File file = root.openNextFile();
+
+    while (file)
+    {
+        if (!file.isDirectory())
+        {
+            const char* path = file.path();
+
+            if (!callback(path, context))
+            {
+                file.close();
+                root.close();
+                return true;
+            }
+        }
+
+        file.close();
+
+        file = root.openNextFile();
+    }
+
+    root.close();
+
+    return true;
+}
+
 bool SdCard::mkdir(const char* path)
 {
     if (!ready)
@@ -165,4 +208,36 @@ bool SdCard::removeFile(const char* path)
         return false;
 
     return SD.remove(path);
+}
+
+bool SdCard::listFiles(
+    const char* directory,
+    std::vector<String>& paths
+) const
+{
+    if (!ready)
+        return false;
+
+    File root = SD.open(directory);
+
+    if (!root || !root.isDirectory())
+        return false;
+
+    File file = root.openNextFile();
+
+    while (file)
+    {
+        if (!file.isDirectory())
+        {
+            paths.emplace_back(file.path());
+        }
+
+        file.close();
+
+        file = root.openNextFile();
+    }
+
+    root.close();
+
+    return true;
 }

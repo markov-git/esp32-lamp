@@ -8,6 +8,7 @@
 #include "../system/SystemInfo.h"
 #include "../sensors/Sensors.h"
 #include "../time/Rtc.h"
+#include "../history/History.h"
 
 class Api
 {
@@ -16,7 +17,8 @@ public:
         LightingController& lightingController,
         SystemInfo& systemInfo,
         Sensors& sensors,
-        Rtc& rtc
+        Rtc& rtc,
+        History& history
     );
 
     void registerRoutes(WebServer& server);
@@ -26,6 +28,9 @@ private:
     SystemInfo& systemInfo;
     Sensors& sensors;
     Rtc& rtc;
+    History& history;
+
+    void handleGetHistory(WebServer& server);
 
     void handleState(WebServer& server);
     void handleSystem(WebServer& server);

@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <vector>
+
 #include "History.h"
 
 History::History(
@@ -273,4 +276,356 @@ uint32_t History::calculateCrc32(
 bool History::ensureDirectory()
 {
     return sdCard.mkdir(DIRECTORY);
+}
+
+bool History::forEachRecord(
+    HistoryRange range,
+    const DateTime& now,
+    HistoryRecordCallback callback,
+    void* context
+) const
+{
+    if (!sdCard.isReady())
+        return false;
+
+    if (callback == nullptr)
+        return false;
+
+    if (range == HistoryRange::Day)
+    {
+        const DateTime yesterday =
+            now - TimeSpan(1, 0, 0, 0);
+
+        const String yesterdayPath =
+            getFilePath(yesterday);
+
+        if (sdCard.exists(yesterdayPath.c_str()))
+        {
+            readFileRecords(
+                yesterdayPath,
+                callback,
+                context
+            );
+        }
+
+        const String todayPath =
+            getFilePath(now);
+
+        if (sdCard.exists(todayPath.c_str()))
+        {
+            readFileRecords(
+                todayPath,
+                callback,
+                context
+            );
+        }
+
+        return true;
+    }
+
+    std::vector<String> paths;
+
+    if (!sdCard.listFiles(
+            DIRECTORY,
+            paths))
+    {
+        Serial.println(
+            "History: failed to list history files"
+        );
+
+        return false;
+    }
+
+    std::sort(
+        paths.begin(),
+        paths.end()
+    );
+
+    if (range == HistoryRange::All)
+    {
+        for (const String& path : paths)
+        {
+            if (!path.endsWith(".csv"))
+                continue;
+
+            readFileRecords(
+                path,
+                callback,
+                context
+            );
+        }
+
+        return true;
+    }
+
+    // Month:
+    const DateTime firstDay =
+        now - TimeSpan(30, 0, 0, 0);
+
+    const String firstPath =
+        getFilePath(firstDay);
+
+    const String lastPath =
+        getFilePath(now);
+
+    for (const String& path : paths)
+    {
+        if (!path.endsWith(".csv"))
+            continue;
+
+        if (path < firstPath)
+            continue;
+
+        if (path > lastPath)
+            continue;
+
+        readFileRecords(
+            path,
+            callback,
+            context
+        );
+    }
+
+    return true;
+}
+
+bool History::readFileRecords(
+    const String& path,
+    HistoryRecordCallback callback,
+    void* context
+) const
+{
+    if (!sdCard.isReady())
+        return false;
+
+    File file = sdCard.open(path.c_str(), FILE_READ);
+
+    if (!file)
+    {
+        Serial.print("History: failed to open file: ");
+        Serial.println(path);
+
+        return false;
+    }
+
+    // Skip CSV header.
+    file.readStringUntil('\n');
+
+    while (file.available())
+    {
+        String line = file.readStringUntil('\n');
+        line.trim();
+
+        if (line.isEmpty())
+            continue;
+
+        HistoryRecord record{};
+
+        if (!parseRecord(line, record))
+        {
+            Serial.print(
+                "History: invalid record in "
+            );
+            Serial.println(path);
+
+            continue;
+        }
+
+        if (!isRecordCrcValid(line))
+        {
+            Serial.print(
+                "History: CRC mismatch in "
+            );
+            Serial.println(path);
+
+            continue;
+        }
+
+        callback(record, context);
+    }
+
+    file.close();
+
+    return true;
+}
+
+bool History::parseRecord(
+    const String& line,
+    HistoryRecord& record
+) const
+{
+    char buffer[256];
+
+    if (line.length() >= sizeof(buffer))
+        return false;
+
+    line.toCharArray(buffer, sizeof(buffer));
+
+    char* fields[11];
+
+    uint8_t fieldCount = 0;
+
+    char* token = strtok(buffer, ",");
+
+    while (token != nullptr && fieldCount < 11)
+    {
+        fields[fieldCount++] = token;
+        token = strtok(nullptr, ",");
+    }
+
+    if (fieldCount != 11)
+        return false;
+
+    char* end = nullptr;
+
+    const unsigned long timestamp =
+        strtoul(fields[0], &end, 10);
+
+    if (*end != '\0')
+        return false;
+
+    record.timestamp =
+        static_cast<uint32_t>(timestamp);
+
+    record.temperature =
+        strtof(fields[1], &end);
+
+    if (*end != '\0')
+        return false;
+
+    record.humidity =
+        strtof(fields[2], &end);
+
+    if (*end != '\0')
+        return false;
+
+    record.pressure =
+        strtof(fields[3], &end);
+
+    if (*end != '\0')
+        return false;
+
+    record.soilRaw[0] =
+        static_cast<uint16_t>(
+            strtoul(fields[4], &end, 10)
+        );
+
+    if (*end != '\0')
+        return false;
+
+    record.soilPercent[0] =
+        static_cast<uint8_t>(
+            strtoul(fields[5], &end, 10)
+        );
+
+    if (*end != '\0')
+        return false;
+
+    record.soilRaw[1] =
+        static_cast<uint16_t>(
+            strtoul(fields[6], &end, 10)
+        );
+
+    if (*end != '\0')
+        return false;
+
+    record.soilPercent[1] =
+        static_cast<uint8_t>(
+            strtoul(fields[7], &end, 10)
+        );
+
+    if (*end != '\0')
+        return false;
+
+    record.soilRaw[2] =
+        static_cast<uint16_t>(
+            strtoul(fields[8], &end, 10)
+        );
+
+    if (*end != '\0')
+        return false;
+
+    record.soilPercent[2] =
+        static_cast<uint8_t>(
+            strtoul(fields[9], &end, 10)
+        );
+
+    if (*end != '\0')
+        return false;
+
+    return true;
+}
+
+bool History::isRecordCrcValid(
+    const String& line
+) const
+{
+    const int separator = line.lastIndexOf(',');
+
+    if (separator < 0)
+        return false;
+
+    const String data =
+        line.substring(0, separator);
+
+    const String crcText =
+        line.substring(separator + 1);
+
+    if (crcText.length() != 8)
+        return false;
+
+    const uint32_t expectedCrc =
+        strtoul(crcText.c_str(), nullptr, 16);
+
+    const uint32_t actualCrc =
+        calculateCrc32(data);
+
+    return expectedCrc == actualCrc;
+}
+
+bool History::readAllRecords(
+    HistoryRecordCallback callback,
+    void* context
+) const
+{
+    std::vector<String> paths;
+
+    if (!sdCard.listFiles(
+            DIRECTORY,
+            paths))
+    {
+        Serial.println(
+            "History: failed to list history files"
+        );
+
+        return false;
+    }
+
+    std::sort(
+        paths.begin(),
+        paths.end()
+    );
+
+    for (const String& path : paths)
+    {
+        if (!path.endsWith(".csv"))
+            continue;
+
+        if (!readFileRecords(
+                path,
+                callback,
+                context))
+        {
+            Serial.print(
+                "History: failed to read file: "
+            );
+            Serial.println(path);
+
+            // ошибки файла логируем
+            // остальные файлы продолжаем читать
+            continue;
+        }
+    }
+
+    return true;
 }
