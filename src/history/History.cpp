@@ -34,20 +34,36 @@ void History::update(
         static_cast<int64_t>(timestamp.unixtime());
 
     if (
-        lastRecordTimestamp >= 0 &&
-        currentTimestamp - lastRecordTimestamp <
+        lastAttemptTimestamp >= 0 &&
+        currentTimestamp - lastAttemptTimestamp <
             RECORD_INTERVAL_SECONDS
     )
     {
         return;
     }
 
+    lastAttemptTimestamp = currentTimestamp;
+
     const SensorsState state =
         sensors.getState();
 
-    if (record(timestamp, state))
+    if (!isValidState(state))
     {
-        lastRecordTimestamp = currentTimestamp;
+        Serial.println(
+            "History: invalid sensor state, "
+            "record skipped"
+        );
+
+        return;
+    }
+
+    if (!record(timestamp, state))
+    {
+        Serial.println(
+            "History: failed to record data"
+        );
+
+        return;
     }
 }
 
@@ -192,6 +208,55 @@ String History::getFilePath(
     );
 
     return String(filename);
+}
+
+bool History::isValidState(
+    const SensorsState& state
+) const
+{
+    if (!isfinite(state.bme280.temperature))
+    {
+        Serial.println(
+            "History: invalid temperature"
+        );
+
+        return false;
+    }
+
+    if (!isfinite(state.bme280.humidity))
+    {
+        Serial.println(
+            "History: invalid humidity"
+        );
+
+        return false;
+    }
+
+    if (!isfinite(state.bme280.pressure))
+    {
+        Serial.println(
+            "History: invalid pressure"
+        );
+
+        return false;
+    }
+
+    for (uint8_t i = 0;
+         i < SoilMoisture::SENSOR_COUNT;
+         i++)
+    {
+        if (state.soilMoisture.percent[i] > 100)
+        {
+            Serial.print(
+                "History: invalid soil moisture percent, sensor "
+            );
+            Serial.println(i + 1);
+
+            return false;
+        }
+    }
+
+    return true;
 }
 
 uint32_t History::calculateCrc32(

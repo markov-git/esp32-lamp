@@ -31,7 +31,9 @@ private:
     SdCard& sdCard;
     Sensors& sensors;
 
-    int64_t lastRecordTimestamp = -1;
+    int64_t lastAttemptTimestamp = -1;
+
+    bool isValidState(const SensorsState& state) const;
 
     bool record(
         const DateTime& timestamp,
