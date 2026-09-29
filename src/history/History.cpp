@@ -210,40 +210,29 @@ String History::getFilePath(
     return String(filename);
 }
 
-bool History::isValidState(
-    const SensorsState& state
-) const
+bool History::isValidState(const SensorsState& state) const
 {
+    bool valid = true;
+
     if (!isfinite(state.bme280.temperature))
     {
-        Serial.println(
-            "History: invalid temperature"
-        );
-
-        return false;
+        Serial.println("History: invalid temperature");
+        valid = false;
     }
 
     if (!isfinite(state.bme280.humidity))
     {
-        Serial.println(
-            "History: invalid humidity"
-        );
-
-        return false;
+        Serial.println("History: invalid humidity");
+        valid = false;
     }
 
     if (!isfinite(state.bme280.pressure))
     {
-        Serial.println(
-            "History: invalid pressure"
-        );
-
-        return false;
+        Serial.println("History: invalid pressure");
+        valid = false;
     }
 
-    for (uint8_t i = 0;
-         i < SoilMoisture::SENSOR_COUNT;
-         i++)
+    for (uint8_t i = 0; i < SoilMoisture::SENSOR_COUNT; i++)
     {
         if (state.soilMoisture.percent[i] > 100)
         {
@@ -252,11 +241,11 @@ bool History::isValidState(
             );
             Serial.println(i + 1);
 
-            return false;
+            valid = false;
         }
     }
 
-    return true;
+    return valid;
 }
 
 uint32_t History::calculateCrc32(
