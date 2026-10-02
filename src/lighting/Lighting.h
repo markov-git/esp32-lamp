@@ -108,7 +108,7 @@ private:
     LightingState currentState{};
 
     uint8_t getLampIndex(Lamp lamp) const;
-    uint8_t Lighting::getPwmIndex(
+    uint8_t getPwmIndex(
         Lamp lamp,
         Channel channel
     ) const;
