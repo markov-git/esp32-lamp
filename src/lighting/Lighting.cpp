@@ -1,5 +1,9 @@
 #include "Lighting.h"
 
+constexpr uint8_t Lighting::PWM_PINS[Lighting::PWM_PIN_COUNT];
+
+constexpr uint8_t Lighting::PWM_CHANNELS[Lighting::PWM_PIN_COUNT];
+
 namespace
 {
     constexpr uint8_t MAX_BRIGHTNESS = 100;
