@@ -10,22 +10,24 @@ void Lighting::begin()
     manualState = {};
     currentState = {};
 
-    ledcSetup(
-        TEST_PWM_CHANNEL,
-        PWM_FREQUENCY,
-        PWM_RESOLUTION
-    );
+    for (uint8_t i = 0; i < PWM_PIN_COUNT; i++)
+    {
+        ledcSetup(
+            PWM_CHANNELS[i],
+            PWM_FREQUENCY,
+            PWM_RESOLUTION
+        );
 
-    ledcAttachPin(
-        TEST_PIN,
-        TEST_PWM_CHANNEL
-    );
+        ledcAttachPin(
+            PWM_PINS[i],
+            PWM_CHANNELS[i]
+        );
 
-    applyBrightness(
-        Lamp::Lamp1,
-        Channel::Red,
-        0
-    );
+        ledcWrite(
+            PWM_CHANNELS[i],
+            0
+        );
+    }
 }
 
 bool Lighting::setManualBrightness(
@@ -82,8 +84,8 @@ void Lighting::setState(
 )
 {
     for (uint8_t lampIndex = 0;
-         lampIndex < LAMP_COUNT;
-         lampIndex++)
+        lampIndex < LAMP_COUNT;
+        lampIndex++)
     {
         const Lamp lamp =
             static_cast<Lamp>(lampIndex);
@@ -126,6 +128,15 @@ uint8_t Lighting::getLampIndex(Lamp lamp) const
     return static_cast<uint8_t>(lamp);
 }
 
+uint8_t Lighting::getPwmIndex(
+    Lamp lamp,
+    Channel channel
+) const
+{
+    return getLampIndex(lamp) * CHANNELS_PER_LAMP +
+        static_cast<uint8_t>(channel);
+}
+
 uint8_t Lighting::getChannelIndex(Channel channel) const
 {
     return static_cast<uint8_t>(channel);
@@ -137,20 +148,14 @@ void Lighting::applyBrightness(
     uint8_t percent
 )
 {
-    // Currently only the physical test channel exists.
-    if (
-        lamp == Lamp::Lamp1 &&
-        channel == Channel::Red
-    )
-    {
-        const uint8_t duty =
-            static_cast<uint16_t>(percent) *
-            255 /
-            100;
+    const uint8_t index =
+        getPwmIndex(lamp, channel);
 
-        ledcWrite(
-            TEST_PWM_CHANNEL,
-            duty
-        );
-    }
+    const uint8_t pwmValue =
+        static_cast<uint16_t>(percent) * 255 / 100;
+
+    ledcWrite(
+        PWM_CHANNELS[index],
+        pwmValue
+    );
 }

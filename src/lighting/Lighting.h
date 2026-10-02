@@ -84,13 +84,34 @@ private:
     static constexpr uint32_t PWM_FREQUENCY = 1000;
     static constexpr uint8_t PWM_RESOLUTION = 8;
 
-    static constexpr uint8_t TEST_PIN = 16;
-    static constexpr uint8_t TEST_PWM_CHANNEL = 0;
+    static constexpr uint8_t PWM_PIN_COUNT = 6;
+
+    static constexpr uint8_t PWM_PINS[PWM_PIN_COUNT] = {
+        16,  // Lamp1 Red
+        17,  // Lamp1 Blue
+        25,  // Lamp2 Red
+        26,  // Lamp2 Blue
+        27,  // Lamp3 Red
+        33   // Lamp3 Blue
+    };
+
+    static constexpr uint8_t PWM_CHANNELS[PWM_PIN_COUNT] = {
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+    };
 
     LightingState manualState{};
     LightingState currentState{};
 
     uint8_t getLampIndex(Lamp lamp) const;
+    uint8_t Lighting::getPwmIndex(
+        Lamp lamp,
+        Channel channel
+    ) const;
     uint8_t getChannelIndex(Channel channel) const;
 
     void applyBrightness(
