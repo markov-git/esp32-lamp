@@ -37,21 +37,19 @@ void LightingController::update(
     bool force
 )
 {
-    const int32_t currentScheduleMinute =
-        static_cast<int32_t>(
-            now.unixtime() / 60
-        );
+    const int64_t currentScheduleSecond =
+        static_cast<int64_t>(now.unixtime());
 
     if (
         !force &&
-        currentScheduleMinute == lastScheduleMinute
+        currentScheduleSecond == lastScheduleSecond
     )
     {
         return;
     }
 
-    lastScheduleMinute =
-        currentScheduleMinute;
+    lastScheduleSecond =
+        currentScheduleSecond;
 
     const ScheduleState scheduleState =
         schedule.getState(now);

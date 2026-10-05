@@ -98,7 +98,7 @@ private:
 
     uint8_t calculateBrightness(
         const ScheduleEntry& entry,
-        uint16_t currentMinute
+        uint32_t currentSecond
     ) const;
 
     bool isDayEnabled(

@@ -29,7 +29,7 @@ namespace
         if (
             array.size() >
             Schedule::MAX_ENTRIES_PER_CHANNEL
-        )
+            )
         {
             return false;
         }
@@ -45,7 +45,7 @@ namespace
                 !object["brightness"].is<int>() ||
                 !object["fadeIn"].is<int>() ||
                 !object["fadeOut"].is<int>()
-            )
+                )
             {
                 return false;
             }
@@ -75,7 +75,7 @@ namespace
                 brightness < 0 || brightness > 100 ||
                 fadeIn < 0 || fadeIn > 1440 ||
                 fadeOut < 0 || fadeOut > 1440
-            )
+                )
             {
                 return false;
             }
@@ -136,8 +136,8 @@ bool Schedule::save() const
         doc["lamps"].to<JsonArray>();
 
     for (uint8_t i = 0;
-         i < Lighting::LAMP_COUNT;
-         i++)
+        i < Lighting::LAMP_COUNT;
+        i++)
     {
         const LampSchedule& schedule =
             schedules[i];
@@ -152,8 +152,8 @@ bool Schedule::save() const
             lamp["red"].to<JsonArray>();
 
         for (uint8_t j = 0;
-             j < schedule.redCount;
-             j++)
+            j < schedule.redCount;
+            j++)
         {
             const ScheduleEntry& source =
                 schedule.red[j];
@@ -184,8 +184,8 @@ bool Schedule::save() const
             lamp["blue"].to<JsonArray>();
 
         for (uint8_t j = 0;
-             j < schedule.blueCount;
-             j++)
+            j < schedule.blueCount;
+            j++)
         {
             const ScheduleEntry& source =
                 schedule.blue[j];
@@ -316,12 +316,12 @@ bool Schedule::load()
 
     if (
         doc["timezoneOffsetMinutes"]
-            .is<int>()
-    )
+        .is<int>()
+        )
     {
         timezoneOffsetMinutes =
             doc["timezoneOffsetMinutes"]
-                .as<int16_t>();
+            .as<int16_t>();
     }
 
     JsonArrayConst lamps =
@@ -350,8 +350,8 @@ bool Schedule::load()
     }
 
     for (uint8_t i = 0;
-         i < Lighting::LAMP_COUNT;
-         i++)
+        i < Lighting::LAMP_COUNT;
+        i++)
     {
         JsonObjectConst lamp =
             lamps[i].as<JsonObjectConst>();
@@ -367,10 +367,10 @@ bool Schedule::load()
             lamp["enabled"] | false;
 
         if (!loadChannel(
-                lamp["red"],
-                schedules[i].red,
-                schedules[i].redCount
-            ))
+            lamp["red"],
+            schedules[i].red,
+            schedules[i].redCount
+        ))
         {
             clear();
 
@@ -378,10 +378,10 @@ bool Schedule::load()
         }
 
         if (!loadChannel(
-                lamp["blue"],
-                schedules[i].blue,
-                schedules[i].blueCount
-            ))
+            lamp["blue"],
+            schedules[i].blue,
+            schedules[i].blueCount
+        ))
         {
             clear();
 
@@ -417,7 +417,7 @@ ScheduleError Schedule::addEntry(
     if (
         entry.startMinute >= entry.endMinute ||
         entry.endMinute > 1440
-    )
+        )
     {
         return ScheduleError::InvalidTime;
     }
@@ -431,7 +431,7 @@ ScheduleError Schedule::addEntry(
     if (
         entry.fadeInMinutes > duration ||
         entry.fadeOutMinutes > duration
-    )
+        )
     {
         return ScheduleError::InvalidFade;
     }
@@ -460,7 +460,7 @@ ScheduleError Schedule::addEntry(
         if (
             (entry.days & entries[i].days) != 0 &&
             hasOverlap(entry, entries[i])
-        )
+            )
         {
             return ScheduleError::Overlap;
         }
@@ -503,7 +503,7 @@ ScheduleError Schedule::updateEntry(
     if (
         entry.startMinute >= entry.endMinute ||
         entry.endMinute > 1440
-    )
+        )
     {
         return ScheduleError::InvalidTime;
     }
@@ -517,7 +517,7 @@ ScheduleError Schedule::updateEntry(
     if (
         entry.fadeInMinutes > duration ||
         entry.fadeOutMinutes > duration
-    )
+        )
     {
         return ScheduleError::InvalidFade;
     }
@@ -530,7 +530,7 @@ ScheduleError Schedule::updateEntry(
         if (
             (entry.days & entries[i].days) != 0 &&
             hasOverlap(entry, entries[i])
-        )
+            )
         {
             return ScheduleError::Overlap;
         }
@@ -604,16 +604,17 @@ ScheduleState Schedule::getState(
         static_cast<int32_t>(timezoneOffsetMinutes) * 60
     );
 
-    const uint16_t currentMinute =
-        localTime.hour() * 60 +
-        localTime.minute();
+    const uint32_t currentSecond =
+        localTime.hour() * 3600UL +
+        localTime.minute() * 60UL +
+        localTime.second();
 
     const uint8_t dayOfWeek =
         now.dayOfTheWeek();
 
     for (uint8_t lampIndex = 0;
-         lampIndex < Lighting::LAMP_COUNT;
-         lampIndex++)
+        lampIndex < Lighting::LAMP_COUNT;
+        lampIndex++)
     {
         const LampSchedule& schedule =
             schedules[lampIndex];
@@ -636,7 +637,7 @@ ScheduleState Schedule::getState(
             const uint8_t brightness =
                 calculateBrightness(
                     entry,
-                    currentMinute
+                    currentSecond
                 );
 
             state.lamps[lampIndex].red = brightness;
@@ -655,7 +656,7 @@ ScheduleState Schedule::getState(
             const uint8_t brightness =
                 calculateBrightness(
                     entry,
-                    currentMinute
+                    currentSecond
                 );
 
             state.lamps[lampIndex].blue = brightness;
@@ -672,65 +673,60 @@ uint8_t Schedule::getLampIndex(Lamp lamp) const
 
 uint8_t Schedule::calculateBrightness(
     const ScheduleEntry& entry,
-    uint16_t currentMinute
+    uint32_t currentSecond
 ) const
 {
-    if (!isEntryActive(entry, currentMinute))
+    const uint32_t startSecond =
+        static_cast<uint32_t>(entry.startMinute) * 60UL;
+
+    const uint32_t endSecond =
+        static_cast<uint32_t>(entry.endMinute) * 60UL;
+
+    if (currentSecond < startSecond ||
+        currentSecond >= endSecond)
     {
         return 0;
     }
 
     if (entry.brightness == 0)
-    {
         return 0;
-    }
 
-    // No fade.
+    const uint32_t fadeInSeconds =
+        static_cast<uint32_t>(entry.fadeInMinutes) * 60UL;
+
+    const uint32_t fadeOutSeconds =
+        static_cast<uint32_t>(entry.fadeOutMinutes) * 60UL;
+
+    // Fade in
     if (
-        entry.fadeInMinutes == 0 &&
-        entry.fadeOutMinutes == 0
+        fadeInSeconds > 0 &&
+        currentSecond < startSecond + fadeInSeconds
     )
     {
-        if (currentMinute >= entry.endMinute)
-        {
-            return 0;
-        }
-
-        return entry.brightness;
-    }
-
-    // Fade-in.
-    if (
-        entry.fadeInMinutes > 0 &&
-        currentMinute <
-            entry.startMinute + entry.fadeInMinutes
-    )
-    {
-        const uint16_t elapsed =
-            currentMinute - entry.startMinute;
+        const uint32_t elapsed =
+            currentSecond - startSecond;
 
         const float progress =
             static_cast<float>(elapsed) /
-            static_cast<float>(entry.fadeInMinutes);
+            static_cast<float>(fadeInSeconds);
 
         return static_cast<uint8_t>(
             entry.brightness * progress
         );
     }
 
-    // Fade-out.
+    // Fade out
     if (
-        entry.fadeOutMinutes > 0 &&
-        currentMinute >
-            entry.endMinute - entry.fadeOutMinutes
+        fadeOutSeconds > 0 &&
+        currentSecond >= endSecond - fadeOutSeconds
     )
     {
-        const uint16_t remaining =
-            entry.endMinute - currentMinute;
+        const uint32_t remaining =
+            endSecond - currentSecond;
 
         const float progress =
             static_cast<float>(remaining) /
-            static_cast<float>(entry.fadeOutMinutes);
+            static_cast<float>(fadeOutSeconds);
 
         return static_cast<uint8_t>(
             entry.brightness * progress

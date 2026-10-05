@@ -67,14 +67,27 @@ void setup() {
     Serial.println("App started");
 }
 
+constexpr uint32_t CONTROL_UPDATE_INTERVAL_MS = 1000;
+uint32_t lastControlUpdateMs = 0;
+
 void loop()
 {
-    const DateTime now = rtc.getDateTime();
+    const uint32_t currentMillis = millis();
 
-    lightingController.update(now);
+    if (
+        currentMillis - lastControlUpdateMs >=
+        CONTROL_UPDATE_INTERVAL_MS
+    )
+    {
+        lastControlUpdateMs +=
+            CONTROL_UPDATE_INTERVAL_MS;
+
+        const DateTime now =
+            rtc.getDateTime();
+
+        lightingController.update(now);
+        history.update(now);
+    }
+
     server.handleClient();
-
-    const SensorsState sensorState = sensors.getState();
-
-    history.update(now);
 }
