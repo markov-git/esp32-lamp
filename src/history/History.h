@@ -61,6 +61,7 @@ private:
     static constexpr uint16_t MAX_HISTORY_FILES = 4000;
     static constexpr uint8_t HISTORY_PATH_LENGTH = 32;
 
+    static constexpr uint32_t FIRST_RECORD_DELAY_SECONDS = 60;
     static constexpr uint32_t RECORD_INTERVAL_SECONDS = 10 * 60;
     static constexpr const char* DIRECTORY = "/history";
     static constexpr const char* HEADER =
@@ -75,6 +76,7 @@ private:
     SdCard& sdCard;
     Sensors& sensors;
 
+    int64_t startTimestamp = -1;
     int64_t lastAttemptTimestamp = -1;
 
     bool isValidState(const SensorsState& state) const;

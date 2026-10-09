@@ -36,6 +36,18 @@ void History::update(
     const int64_t currentTimestamp =
         static_cast<int64_t>(timestamp.unixtime());
 
+    if (startTimestamp < 0)
+    {
+        startTimestamp = currentTimestamp;
+        return;
+    }
+
+    if (currentTimestamp - startTimestamp <
+        FIRST_RECORD_DELAY_SECONDS)
+    {
+        return;
+    }
+
     if (
         lastAttemptTimestamp >= 0 &&
         currentTimestamp - lastAttemptTimestamp <
