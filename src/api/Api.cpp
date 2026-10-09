@@ -420,6 +420,17 @@ void Api::sendSensors(WebServer& server)
         soil["percent"] = state.soilMoisture.percent[i];
     }
 
+    JsonObject scd41 = doc["scd41"].to<JsonObject>();
+
+    scd41["available"] = state.scd41.available;
+
+    if (state.scd41.available)
+    {
+        scd41["co2Ppm"] = state.scd41.co2Ppm;
+        scd41["temperature"] = state.scd41.temperature;
+        scd41["humidity"] = state.scd41.humidity;
+    }
+
     String json;
     serializeJson(doc, json);
 
