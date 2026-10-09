@@ -4,21 +4,47 @@ bool Scd41::begin()
 {
     sensor.begin(Wire, I2C_ADDRESS);
 
+    delay(30);
+
+    sensor.wakeUp();
+    delay(30);
+
+    sensor.stopPeriodicMeasurement();
+    delay(500);
+
+    // Перезагрузить сохранённые настройки датчика.
+    const uint16_t reinitError = sensor.reinit();
+
+    if (reinitError != 0)
+    {
+        Serial.print("SCD41: reinit failed: ");
+        Serial.println(reinitError);
+        initialized = false;
+        return false;
+    }
+
+    delay(30);
+
     const uint16_t error =
         sensor.startPeriodicMeasurement();
 
     if (error != 0)
     {
+        char errorMessage[64];
+
         Serial.print("SCD41: start failed: ");
-        Serial.println(error);
+        Serial.print(error);
+        Serial.print(" (");
+
+        errorToString(error, errorMessage, sizeof(errorMessage));
+        Serial.print(errorMessage);
+        Serial.println(")");
 
         initialized = false;
         return false;
     }
 
     initialized = true;
-
-    Serial.println("SCD41: periodic measurement started");
 
     return true;
 }
