@@ -14,17 +14,14 @@ struct Scd41State {
 class Scd41 {
 public:
     bool begin();
-    void update();
 
-    const Scd41State& getState();
+    Scd41State getState();
 
 private:
     SensirionI2cScd4x sensor;
     Scd41State state;
 
-    bool started = false;
-    uint32_t lastCheckMs = 0;
+    bool initialized = false;
 
     static constexpr uint8_t I2C_ADDRESS = 0x62;
-    static constexpr uint32_t CHECK_INTERVAL_MS = 500;
 };

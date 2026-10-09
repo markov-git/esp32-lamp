@@ -40,6 +40,17 @@ namespace
             item["percent"] = record.soilPercent[i];
         }
 
+        JsonObject scd41 = doc["scd41"].to<JsonObject>();
+
+        scd41["available"] = record.scd41Available;
+
+        if (record.scd41Available)
+        {
+            scd41["co2Ppm"] = record.scd41Co2Ppm;
+            scd41["temperature"] = record.scd41Temperature;
+            scd41["humidity"] = record.scd41Humidity;
+        }
+
         String json;
         serializeJson(doc, json);
 

@@ -8,7 +8,7 @@ History::History(
     Sensors& sensors
 )
     : sdCard(sdCard),
-      sensors(sensors)
+    sensors(sensors)
 {
 }
 
@@ -39,8 +39,8 @@ void History::update(
     if (
         lastAttemptTimestamp >= 0 &&
         currentTimestamp - lastAttemptTimestamp <
-            RECORD_INTERVAL_SECONDS
-    )
+        RECORD_INTERVAL_SECONDS
+        )
     {
         return;
     }
@@ -83,15 +83,45 @@ bool History::record(
     if (!ensureFileHeader(path))
         return false;
 
-    char data[192];
+    char scd41Available[2] = "0";
+    char scd41Co2[8] = "";
+    char scd41Temperature[16] = "";
+    char scd41Humidity[16] = "";
+
+    if (state.scd41.available)
+    {
+        scd41Available[0] = '1';
+
+        snprintf(
+            scd41Co2,
+            sizeof(scd41Co2),
+            "%u",
+            state.scd41.co2Ppm
+        );
+
+        snprintf(
+            scd41Temperature,
+            sizeof(scd41Temperature),
+            "%.2f",
+            state.scd41.temperature
+        );
+
+        snprintf(
+            scd41Humidity,
+            sizeof(scd41Humidity),
+            "%.2f",
+            state.scd41.humidity
+        );
+    }
+
+    char data[256];
 
     snprintf(
         data,
         sizeof(data),
         "%lu,%.2f,%.2f,%.2f,"
-        "%u,%u,"
-        "%u,%u,"
-        "%u,%u",
+        "%u,%u,%u,%u,%u,%u,"
+        "%s,%s,%s,%s",
         static_cast<unsigned long>(timestamp.unixtime()),
         state.bme280.temperature,
         state.bme280.humidity,
@@ -101,7 +131,11 @@ bool History::record(
         state.soilMoisture.raw[1],
         state.soilMoisture.percent[1],
         state.soilMoisture.raw[2],
-        state.soilMoisture.percent[2]
+        state.soilMoisture.percent[2],
+        scd41Available,
+        scd41Co2,
+        scd41Temperature,
+        scd41Humidity
     );
 
     const String dataString(data);
@@ -326,8 +360,8 @@ bool History::forEachRecord(
     std::vector<String> paths;
 
     if (!sdCard.listFiles(
-            DIRECTORY,
-            paths))
+        DIRECTORY,
+        paths))
     {
         Serial.println(
             "History: failed to list history files"
@@ -456,102 +490,146 @@ bool History::parseRecord(
 {
     char buffer[256];
 
-    if (line.length() >= sizeof(buffer))
+    if (line.isEmpty() || line.length() >= sizeof(buffer))
         return false;
 
     line.toCharArray(buffer, sizeof(buffer));
 
-    char* fields[11];
-
+    char* fields[15];
     uint8_t fieldCount = 0;
+    char* fieldStart = buffer;
 
-    char* token = strtok(buffer, ",");
-
-    while (token != nullptr && fieldCount < 11)
+    // Разделяем строку вручную, сохраняя пустые поля.
+    for (char* p = buffer; ; ++p)
     {
-        fields[fieldCount++] = token;
-        token = strtok(nullptr, ",");
+        if (*p == ',' || *p == '\0')
+        {
+            if (fieldCount >= 15)
+                return false;
+
+            fields[fieldCount++] = fieldStart;
+
+            if (*p == '\0')
+                break;
+
+            *p = '\0';
+            fieldStart = p + 1;
+        }
     }
 
-    if (fieldCount != 11)
+    if (fieldCount != 15)
         return false;
 
     char* end = nullptr;
 
+    // timestamp
     const unsigned long timestamp =
         strtoul(fields[0], &end, 10);
 
-    if (*end != '\0')
+    if (fields[0][0] == '\0' || *end != '\0' ||
+        timestamp > UINT32_MAX)
         return false;
 
-    record.timestamp =
-        static_cast<uint32_t>(timestamp);
+    record.timestamp = static_cast<uint32_t>(timestamp);
 
-    record.temperature =
-        strtof(fields[1], &end);
-
-    if (*end != '\0')
+    // Температура, влажность и давление BME280.
+    record.temperature = strtof(fields[1], &end);
+    if (fields[1][0] == '\0' || *end != '\0' ||
+        !isfinite(record.temperature))
         return false;
 
-    record.humidity =
-        strtof(fields[2], &end);
-
-    if (*end != '\0')
+    record.humidity = strtof(fields[2], &end);
+    if (fields[2][0] == '\0' || *end != '\0' ||
+        !isfinite(record.humidity))
         return false;
 
-    record.pressure =
-        strtof(fields[3], &end);
-
-    if (*end != '\0')
+    record.pressure = strtof(fields[3], &end);
+    if (fields[3][0] == '\0' || *end != '\0' ||
+        !isfinite(record.pressure))
         return false;
 
-    record.soilRaw[0] =
-        static_cast<uint16_t>(
-            strtoul(fields[4], &end, 10)
-        );
+    // Вспомогательный разбор целого числа с проверкой диапазона.
+    auto parseUnsigned = [](const char* text,
+        unsigned long maxValue,
+        unsigned long& value) -> bool
+        {
+            if (text[0] == '\0' || text[0] == '-')
+                return false;
 
-    if (*end != '\0')
+            char* end = nullptr;
+            value = strtoul(text, &end, 10);
+
+            return end != text &&
+                *end == '\0' &&
+                value <= maxValue;
+        };
+
+    unsigned long value = 0;
+
+    if (!parseUnsigned(fields[4], UINT16_MAX, value))
         return false;
+    record.soilRaw[0] = static_cast<uint16_t>(value);
 
-    record.soilPercent[0] =
-        static_cast<uint8_t>(
-            strtoul(fields[5], &end, 10)
-        );
-
-    if (*end != '\0')
+    if (!parseUnsigned(fields[5], 100, value))
         return false;
+    record.soilPercent[0] = static_cast<uint8_t>(value);
 
-    record.soilRaw[1] =
-        static_cast<uint16_t>(
-            strtoul(fields[6], &end, 10)
-        );
-
-    if (*end != '\0')
+    if (!parseUnsigned(fields[6], UINT16_MAX, value))
         return false;
+    record.soilRaw[1] = static_cast<uint16_t>(value);
 
-    record.soilPercent[1] =
-        static_cast<uint8_t>(
-            strtoul(fields[7], &end, 10)
-        );
-
-    if (*end != '\0')
+    if (!parseUnsigned(fields[7], 100, value))
         return false;
+    record.soilPercent[1] = static_cast<uint8_t>(value);
 
-    record.soilRaw[2] =
-        static_cast<uint16_t>(
-            strtoul(fields[8], &end, 10)
-        );
-
-    if (*end != '\0')
+    if (!parseUnsigned(fields[8], UINT16_MAX, value))
         return false;
+    record.soilRaw[2] = static_cast<uint16_t>(value);
 
-    record.soilPercent[2] =
-        static_cast<uint8_t>(
-            strtoul(fields[9], &end, 10)
-        );
-
-    if (*end != '\0')
+    if (!parseUnsigned(fields[9], 100, value))
         return false;
+    record.soilPercent[2] = static_cast<uint8_t>(value);
+
+    // SCD41: доступность должна быть строго 0 или 1.
+    if (strcmp(fields[10], "0") == 0)
+    {
+        record.scd41Available = false;
+        record.scd41Co2Ppm = 0;
+        record.scd41Temperature = NAN;
+        record.scd41Humidity = NAN;
+
+        // При недоступном датчике измерения обязаны быть пустыми.
+        if (fields[11][0] != '\0' ||
+            fields[12][0] != '\0' ||
+            fields[13][0] != '\0')
+            return false;
+    }
+    else if (strcmp(fields[10], "1") == 0)
+    {
+        record.scd41Available = true;
+
+        if (!parseUnsigned(fields[11], UINT16_MAX, value) ||
+            value == 0)
+            return false;
+
+        record.scd41Co2Ppm = static_cast<uint16_t>(value);
+
+        record.scd41Temperature = strtof(fields[12], &end);
+        if (fields[12][0] == '\0' || *end != '\0' ||
+            !isfinite(record.scd41Temperature))
+            return false;
+
+        record.scd41Humidity = strtof(fields[13], &end);
+        if (fields[13][0] == '\0' || *end != '\0' ||
+            !isfinite(record.scd41Humidity) ||
+            record.scd41Humidity < 0.0f ||
+            record.scd41Humidity > 100.0f)
+            return false;
+    }
+    else
+    {
+        return false;
+    }
 
     return true;
 }
@@ -591,8 +669,8 @@ bool History::readAllRecords(
     std::vector<String> paths;
 
     if (!sdCard.listFiles(
-            DIRECTORY,
-            paths))
+        DIRECTORY,
+        paths))
     {
         Serial.println(
             "History: failed to list history files"
@@ -612,9 +690,9 @@ bool History::readAllRecords(
             continue;
 
         if (!readFileRecords(
-                path,
-                callback,
-                context))
+            path,
+            callback,
+            context))
         {
             Serial.print(
                 "History: failed to read file: "

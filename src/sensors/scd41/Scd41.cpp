@@ -1,86 +1,81 @@
 #include "Scd41.h"
 
-bool Scd41::begin() {
+bool Scd41::begin()
+{
     sensor.begin(Wire, I2C_ADDRESS);
 
-    // На случай, если периодическое измерение уже запущено.
-    uint16_t error = sensor.stopPeriodicMeasurement();
+    const uint16_t error =
+        sensor.startPeriodicMeasurement();
 
-    if (error != 0) {
-        Serial.print("SCD41: stopPeriodicMeasurement failed: ");
+    if (error != 0)
+    {
+        Serial.print("SCD41: start failed: ");
         Serial.println(error);
-    }
 
-    error = sensor.startPeriodicMeasurement();
-
-    if (error != 0) {
-        Serial.print("SCD41: startPeriodicMeasurement failed: ");
-        Serial.println(error);
-        started = false;
+        initialized = false;
         return false;
     }
 
-    started = true;
-    lastCheckMs = millis();
+    initialized = true;
 
     Serial.println("SCD41: periodic measurement started");
+
     return true;
 }
 
-void Scd41::update() {
-    if (!started) {
-        return;
-    }
-
-    const uint32_t now = millis();
-
-    if (now - lastCheckMs < CHECK_INTERVAL_MS) {
-        return;
-    }
-
-    lastCheckMs = now;
+Scd41State Scd41::getState()
+{
+    if (!initialized)
+        return state;
 
     bool dataReady = false;
-    uint16_t error = sensor.getDataReadyStatus(dataReady);
 
-    if (error != 0) {
-        Serial.print("SCD41: getDataReadyStatus failed: ");
+    uint16_t error =
+        sensor.getDataReadyStatus(dataReady);
+
+    if (error != 0)
+    {
+        Serial.print("SCD41: data-ready check failed: ");
         Serial.println(error);
-        return;
+
+        return state;
     }
 
-    if (!dataReady) {
-        return;
-    }
+    if (!dataReady)
+        return state;
 
     uint16_t co2 = 0;
     float temperature = NAN;
     float humidity = NAN;
 
-    error = sensor.readMeasurement(co2, temperature, humidity);
+    error = sensor.readMeasurement(
+        co2,
+        temperature,
+        humidity
+    );
 
-    if (error != 0) {
-        Serial.print("SCD41: readMeasurement failed: ");
+    if (error != 0)
+    {
+        Serial.print("SCD41: read failed: ");
         Serial.println(error);
-        return;
+
+        return state;
     }
 
-    // CO2 = 0 означает, что измерение ещё не готово
-    // или результат невалиден.
     if (co2 == 0 ||
         !isfinite(temperature) ||
-        !isfinite(humidity)) {
+        !isfinite(humidity) ||
+        humidity < 0.0f ||
+        humidity > 100.0f)
+    {
         Serial.println("SCD41: invalid measurement");
-        return;
+        return state;
     }
 
     state.co2Ppm = co2;
     state.temperature = temperature;
     state.humidity = humidity;
     state.available = true;
-}
 
-const Scd41State& Scd41::getState() {
-    update();
     return state;
 }

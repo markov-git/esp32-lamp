@@ -23,6 +23,11 @@ struct HistoryRecord
 
     uint16_t soilRaw[3];
     uint8_t soilPercent[3];
+
+    bool scd41Available = false;
+    uint16_t scd41Co2Ppm = 0;
+    float scd41Temperature = NAN;
+    float scd41Humidity = NAN;
 };
 
 using HistoryRecordCallback =
@@ -62,7 +67,10 @@ private:
         "timestamp,temperature,humidity,pressure,"
         "soil1_raw,soil1_percent,"
         "soil2_raw,soil2_percent,"
-        "soil3_raw,soil3_percent,crc\n";
+        "soil3_raw,soil3_percent,"
+        "scd41_available,scd41_co2_ppm,"
+        "scd41_temperature,scd41_humidity,"
+        "crc\n";
 
     SdCard& sdCard;
     Sensors& sensors;
