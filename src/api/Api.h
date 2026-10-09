@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <Arduino.h>
+#include <Update.h>
 
 #include "../controller/LightingController.h"
 #include "../system/SystemInfo.h"
@@ -29,6 +30,12 @@ private:
     Sensors& sensors;
     Rtc& rtc;
     History& history;
+
+    bool firmwareUpdateStarted = false;
+    bool firmwareUpdateSuccess = false;
+    String firmwareUpdateError;
+    void handleFirmwareUpload(WebServer& server);
+    void handleFirmwareResult(WebServer& server);
 
     void handleGetHistory(WebServer& server);
 

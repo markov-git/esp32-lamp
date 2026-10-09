@@ -192,6 +192,18 @@ void Api::registerRoutes(WebServer& server)
             handleGetHistory(server);
         }
     );
+    server.on(
+        "/api/firmware",
+        HTTP_POST,
+        [this, &server]()
+        {
+            handleFirmwareResult(server);
+        },
+        [this, &server]()
+        {
+            handleFirmwareUpload(server);
+        }
+    );
 }
 
 void Api::handleState(WebServer& server)
@@ -1289,4 +1301,127 @@ bool Api::parseScheduleEntry(
         static_cast<uint16_t>(fadeOut);
 
     return true;
+}
+
+void Api::handleFirmwareUpload(WebServer& server)
+{
+    HTTPUpload& upload = server.upload();
+
+    switch (upload.status)
+    {
+        case UPLOAD_FILE_START:
+        {
+            firmwareUpdateStarted = false;
+            firmwareUpdateSuccess = false;
+            firmwareUpdateError = "";
+
+            if (!upload.filename.endsWith(".bin"))
+            {
+                firmwareUpdateError = "invalid_file_type";
+                Serial.println("OTA: expected a .bin file");
+                break;
+            }
+
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
+            {
+                firmwareUpdateError = "update_begin_failed";
+                Serial.println("OTA: failed to begin update");
+                Update.printError(Serial);
+                break;
+            }
+
+            firmwareUpdateStarted = true;
+
+            Serial.print("OTA: uploading ");
+            Serial.println(upload.filename);
+            break;
+        }
+
+        case UPLOAD_FILE_WRITE:
+        {
+            if (!firmwareUpdateStarted)
+                break;
+
+            const size_t written =
+                Update.write(upload.buf, upload.currentSize);
+
+            if (written != upload.currentSize)
+            {
+                firmwareUpdateError = "flash_write_failed";
+                firmwareUpdateStarted = false;
+
+                Serial.println("OTA: flash write failed");
+                Update.printError(Serial);
+            }
+
+            break;
+        }
+
+        case UPLOAD_FILE_END:
+        {
+            if (!firmwareUpdateStarted)
+                break;
+
+            if (Update.end(true))
+            {
+                firmwareUpdateSuccess = true;
+
+                Serial.print("OTA: upload complete, bytes: ");
+                Serial.println(upload.totalSize);
+            }
+            else
+            {
+                firmwareUpdateError = "update_finalize_failed";
+
+                Serial.println("OTA: finalization failed");
+                Update.printError(Serial);
+            }
+
+            firmwareUpdateStarted = false;
+            break;
+        }
+
+        case UPLOAD_FILE_ABORTED:
+        {
+            firmwareUpdateStarted = false;
+            firmwareUpdateSuccess = false;
+            firmwareUpdateError = "upload_aborted";
+
+            Serial.println("OTA: upload aborted");
+            break;
+        }
+
+        default:
+            break;
+    }
+}
+
+void Api::handleFirmwareResult(WebServer& server)
+{
+    if (firmwareUpdateSuccess)
+    {
+        server.send(
+            200,
+            "application/json",
+            "{\"success\":true,\"message\":\"rebooting\"}"
+        );
+
+        delay(500);
+        ESP.restart();
+        return;
+    }
+
+    String error = firmwareUpdateError;
+
+    if (error.isEmpty())
+        error = "upload_failed";
+
+    JsonDocument doc;
+    doc["success"] = false;
+    doc["error"] = error;
+
+    String json;
+    serializeJson(doc, json);
+
+    server.send(500, "application/json", json);
 }
